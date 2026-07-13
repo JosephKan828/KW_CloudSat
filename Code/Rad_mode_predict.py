@@ -170,6 +170,15 @@ def main() -> None:
     plt.close(fig)
     print(f"Visualization saved to {save_path}")
 
+    # ------------------------------------------------
+    # Save coefficient
+    # ------------------------------------------------
+
+    # file path
+    output_path: Path = root_dir / "Files" / "Linear_Relation"
+
+    np.save(output_path / "regress_coeff.npy", np.array([lw_w1_coeff, lw_w2_coeff, sw_w1_coeff, sw_w2_coeff]))
+
 # ====================================================
 # Execute main function
 # ====================================================
