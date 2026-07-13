@@ -359,6 +359,15 @@ def main() -> None:
     plt.savefig(fig_path / "sw_reconstruct_overlay.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
+    # ------------------------------------------------
+    # Save file
+    # ------------------------------------------------
+
+    # save file
+    save_path: Path = Path("/home/b11209013/KW_CloudSat/Files/Linear_Relation/")
+
+    np.save(save_path / "M_lw.npy", M_lw)
+    np.save(save_path / "M_sw.npy", M_sw)
 
 # ====================================================
 # Execute main function
