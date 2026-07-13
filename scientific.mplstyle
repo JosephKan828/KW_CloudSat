@@ -1,0 +1,81 @@
+# ==============================================================================
+# Scientific & Color-Blind Friendly Matplotlib Style Sheet
+# ==============================================================================
+
+# Font Settings
+font.family: serif
+font.size: 12.0
+axes.labelsize: 12.0
+axes.titlesize: 13.0
+xtick.labelsize: 11.0
+ytick.labelsize: 11.0
+legend.fontsize: 11.0
+
+# Figure Settings
+figure.figsize: 6.0, 4.5
+figure.dpi: 300
+figure.facecolor: white
+figure.edgecolor: white
+figure.autolayout: True
+
+# Axes Settings
+axes.facecolor: white
+axes.edgecolor: 333333
+axes.linewidth: 1.0
+axes.grid: True
+axes.spines.top: False
+axes.spines.right: False
+
+# Grid Settings
+grid.color: e5e5e5
+grid.linestyle: --
+grid.linewidth: 0.8
+grid.alpha: 1.0
+
+# Color Cycle: Okabe-Ito Palette (8 colors)
+# 1. Sky Blue: #56B4E9
+# 2. Orange: #E69F00
+# 3. Bluish Green: #009E73
+# 4. Yellow: #F0E442
+# 5. Blue: #0072B2
+# 6. Vermillion: #D55E00
+# 7. Reddish Purple: #CC79A7
+# 8. Black: #000000
+axes.prop_cycle: cycler('color', ['0072B2', 'D55E00', '009E73', 'E69F00', '56B4E9', 'CC79A7', 'F0E442', '000000'])
+
+# Line Settings
+lines.linewidth: 2.0
+lines.markersize: 6.0
+lines.solid_capstyle: round
+
+# Scatter Settings
+scatter.marker: o
+
+# Ticks Settings
+xtick.direction: out
+xtick.major.size: 4.0
+xtick.minor.size: 2.0
+xtick.major.width: 1.0
+xtick.minor.width: 0.8
+xtick.color: 333333
+
+ytick.direction: out
+ytick.major.size: 4.0
+ytick.minor.size: 2.0
+ytick.major.width: 1.0
+ytick.minor.width: 0.8
+ytick.color: 333333
+
+# Legend Settings
+legend.frameon: True
+legend.framealpha: 0.8
+legend.facecolor: white
+legend.edgecolor: e5e5e5
+legend.fancybox: False
+legend.loc: best
+
+# Savefig Settings
+savefig.dpi: 300
+savefig.format: pdf
+savefig.bbox: tight
+savefig.transparent: False
