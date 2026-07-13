@@ -18,7 +18,7 @@ The project synthesizes three major datasets over the period of 2006–2017 for 
 
 ## 2. Methodology
 
-The analysis is broken down into a four-step pipeline, implemented in the `Code/` directory:
+The analysis is broken down into a five-step pipeline, implemented in the `Code/` directory:
 
 ### Step 1: Kelvin Wave Event Selection (`Code/KW_selection.py`)
 *   **Filtering:** OLR data is symmetrized around the equator and passed through a Space-Time filter to isolate Kelvin waves (equivalent depth $h = 8-90$ m, period $T = 2.5-30$ days, varying wavenumber bands $k$).
@@ -33,6 +33,11 @@ The analysis is broken down into a four-step pipeline, implemented in the `Code/
 *   We attempt to express the radiative heating anomalies ($Q'_{LW}$, $Q'_{SW}$) as a linear map of the vertical motion profile ($w'$).
 *   **Model:** Partial Least Squares (PLS) regression (with 5 components) is applied to extract the Jacobian matrices ($M_{LW}$ and $M_{SW}$), where $Q' \approx M w'$.
 *   The dataset is split into training and validation sets to verify the robustness of the reconstruction.
+
+### Step 5: Radiative Heating Mode Prediction (`Code/Rad_mode_predict.py`)
+*   To further validate and interpret the linear relations, we construct idealized vertical motion profiles representing the first and second baroclinic modes (Mode 1 and Mode 2).
+*   We apply the extracted Jacobian matrices to these idealized profiles to predict the associated radiative heating responses.
+*   The original and reconstructed profiles are then compared to visualize the coupling between distinct vertical dynamic modes and radiative heating.
 
 ## 3. Verification Metrics
 
@@ -52,6 +57,11 @@ The overall scatter of reconstruction against validation data provides the aggre
 We overlay the true validation data (contours) on top of the reconstructed data (color mesh) for the last 676 samples. This demonstrates the model's physical consistency in capturing the vertical tilt and structure of the heating rates.
 
 ![LW Reconstruction](Figure/QR_w_Relation/lw_reconstruct_overlay.png)
+
+### Radiative Mode Prediction Contrast
+Using idealized vertical modes, we visualize the contrast between the original (derived via basis decomposition) and reconstructed (derived via the Jacobian matrices) profiles of the radiative heating rates. This highlights how well the model predicts the radiative responses to pure vertical dynamic modes.
+
+![Radiative Mode Prediction](Figure/Rad_mode_predict.png)
 
 ## 4. Quick Tour of Composite Structures
 
