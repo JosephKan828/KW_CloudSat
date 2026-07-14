@@ -91,21 +91,25 @@ def main() -> None:
     # Load vertical motion as dictionary
     fname_w: List[str] = list(glob(str(input_dir / "w_composite/*.npy")))
 
+    dx: float = 360.0 / 576.0 
+
     w: Dict[str, np.ndarray] = {
-            fname.split("/")[-1].split(".")[0]: np.load(fname)
+            fname.split("/")[-1].split(".")[0]: np.load(fname)[:, int(288-100/dx):int(288+100/dx)]
             for fname in fname_w
             }
+
+    nz, nx = w["k=1~3"].shape
 
     # Load radiative heating rate
     fname_qr: List[str] = list(glob(str(input_dir / "QR_composite/k*")))
 
     lw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/LW.npy")
+            fname.split("/")[-1]: np.load(fname+"/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
             for fname in fname_qr
             }
 
     sw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/SW.npy")
+            fname.split("/")[-1]: np.load(fname+"/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
             for fname in fname_qr
             }
 
@@ -134,9 +138,9 @@ def main() -> None:
     # Split data into training and verifying
     # ------------------------------------------------
 
-    w_train : np.ndarray = w_concat[:37*37*2] ; w_valid : np.ndarray = w_concat[37*37*2:]
-    lw_train: np.ndarray = lw_concat[:37*37*2]; lw_valid: np.ndarray = lw_concat[37*37*2:]
-    sw_train: np.ndarray = sw_concat[:37*37*2]; sw_valid: np.ndarray = sw_concat[37*37*2:]
+    w_train : np.ndarray = w_concat[:nx*5] ; w_valid : np.ndarray = w_concat[nx*5:]
+    lw_train: np.ndarray = lw_concat[:nx*5]; lw_valid: np.ndarray = lw_concat[nx*5:]
+    sw_train: np.ndarray = sw_concat[:nx*5]; sw_valid: np.ndarray = sw_concat[nx*5:]
 
     # ------------------------------------------------
     # Use Partial Least Squares (PLS) regression
@@ -305,10 +309,10 @@ def main() -> None:
     # ------------------------------------------------
     
     # Extract the last 676 samples
-    lw_recon_last = lw_recon[:, -676:]
-    lw_valid_last = lw_valid[-676:, :].T
+    lw_recon_last = lw_recon
+    lw_valid_last = lw_valid.T
     
-    samples = np.arange(676)
+    samples = np.arange(nx*2)
     
     fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
     
