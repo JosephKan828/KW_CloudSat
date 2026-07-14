@@ -113,18 +113,22 @@ def main() -> None:
     # Concatenate data
     # ------------------------------------------------
 
+    keys = sorted(w.keys())
     w_concat: np.ndarray = np.concatenate([
-        val.T for val in w.values()
+        w[k].T for k in keys
         ])
 
-    
     lw_concat: np.ndarray = np.concatenate([
-        val.T for val in lw.values()
+        lw[k].T for k in keys
         ])
 
     sw_concat: np.ndarray = np.concatenate([
-        val.T for val in sw.values()
+        sw[k].T for k in keys
         ])
+
+    pprint(w_concat.shape)
+    pprint(lw_concat.shape)
+    pprint(sw_concat.shape)
 
     # ------------------------------------------------
     # Split data into training and verifying
@@ -185,32 +189,43 @@ def main() -> None:
 
     # Setup figure path
     fig_path: Path = Path.cwd().parent / "Figure" / "QR_w_Relation"
+    os.makedirs(fig_path, exist_ok=True)
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-
+    # M_lw
+    fig, ax = plt.subplots(1, 1, figsize=(7, 6))
     lw_pcm = ax.pcolormesh(
             lev, lev, M_lw,
-            cmap="coolwarm",
-            norm=TwoSlopeNorm(vcenter=0.0)
+            cmap="RdBu_r",
+            norm=TwoSlopeNorm(vcenter=0.0),
+            shading='nearest'
             )
     ax.set_xlim(1000, 100)
     ax.set_ylim(1000, 100)
-
-    fig.colorbar(lw_pcm, ax=ax)
+    ax.set_xlabel("Input w Pressure (hPa)")
+    ax.set_ylabel("Output LW Heating Pressure (hPa)")
+    ax.set_title("Jacobian Matrix ($M_{LW}$)")
+    cbar = fig.colorbar(lw_pcm, ax=ax)
+    cbar.set_label("Response Magnitude")
+    plt.tight_layout()
     plt.savefig(fig_path / "M_lw.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-
+    # M_sw
+    fig, ax = plt.subplots(1, 1, figsize=(7, 6))
     sw_pcm = ax.pcolormesh(
             lev, lev, M_sw,
-            cmap="coolwarm",
-            norm=TwoSlopeNorm(vcenter=0.0)
+            cmap="RdBu_r",
+            norm=TwoSlopeNorm(vcenter=0.0),
+            shading='nearest'
             )
     ax.set_xlim(1000, 100)
     ax.set_ylim(1000, 100)
-
-    fig.colorbar(sw_pcm, ax=ax)
+    ax.set_xlabel("Input w Pressure (hPa)")
+    ax.set_ylabel("Output SW Heating Pressure (hPa)")
+    ax.set_title("Jacobian Matrix ($M_{SW}$)")
+    cbar = fig.colorbar(sw_pcm, ax=ax)
+    cbar.set_label("Response Magnitude")
+    plt.tight_layout()
     plt.savefig(fig_path / "M_sw.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -220,15 +235,27 @@ def main() -> None:
     
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
-    ax[0].scatter(lw_recon.T, lw_valid)
-    ax[1].scatter(sw_recon.T, sw_valid)
+    # Calculate global min/max for identity line
+    lw_min, lw_max = np.min(lw_valid), np.max(lw_valid)
+    sw_min, sw_max = np.min(sw_valid), np.max(sw_valid)
+
+    ax[0].scatter(lw_recon.T, lw_valid, alpha=0.1, s=3, color='steelblue')
+    ax[0].plot([lw_min, lw_max], [lw_min, lw_max], 'k--', lw=1.5, zorder=3)
+    ax[1].scatter(sw_recon.T, sw_valid, alpha=0.1, s=3, color='steelblue')
+    ax[1].plot([sw_min, sw_max], [sw_min, sw_max], 'k--', lw=1.5, zorder=3)
 
     corr_lw = np.corrcoef(lw_valid.flatten(), lw_recon.T.flatten())[0, 1]
     corr_sw = np.corrcoef(sw_valid.flatten(), sw_recon.T.flatten())[0, 1]
 
-    ax[0].set_title(r"Correlation ($R$): " + f"{corr_lw:.3f}")
-    ax[1].set_title(r"Correlation ($R$): " + f"{corr_sw:.3f}")
+    ax[0].set_title(r"LW Heating Validation ($R$ = " + f"{corr_lw:.3f})")
+    ax[1].set_title(r"SW Heating Validation ($R$ = " + f"{corr_sw:.3f})")
 
+    for i in range(2):
+        ax[i].set_xlabel("Reconstructed (K/day)")
+        ax[i].set_ylabel("Validation (K/day)")
+        ax[i].grid(True, linestyle=':', alpha=0.6)
+
+    plt.tight_layout()
     plt.savefig(fig_path / "verify.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -253,24 +280,23 @@ def main() -> None:
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 6), sharey=True)
 
-    # Plot horizontal bar charts (barh) since the y-axis is pressure level
-    ax[0].barh(lev, corr_lw_profile, height=20, align='center', color='coral', edgecolor='black', linewidth=0.5)
-    ax[1].barh(lev, corr_sw_profile, height=20, align='center', color='skyblue', edgecolor='black', linewidth=0.5)
+    # Use a line plot instead of barh for vertical atmospheric profiles
+    ax[0].plot(corr_lw_profile, lev, marker='o', markersize=5, color='coral', linewidth=2, zorder=3)
+    ax[1].plot(corr_sw_profile, lev, marker='o', markersize=5, color='skyblue', linewidth=2, zorder=3)
 
     ax[0].set_title(r"LW Correlation ($R$) Profile")
     ax[1].set_title(r"SW Correlation ($R$) Profile")
     
-    ax[0].set_xlabel(r"Correlation Coefficient ($R$)")
-    ax[1].set_xlabel(r"Correlation Coefficient ($R$)")
-    ax[0].set_ylabel("Pressure (hPa)")
+    for i in range(2):
+        ax[i].set_xlabel(r"Correlation Coefficient ($R$)")
+        ax[i].set_xlim(-0.1, 1.0)
+        ax[i].axvline(0, color='black', linestyle='--', linewidth=1.5, zorder=2)
+        ax[i].grid(True, linestyle=':', alpha=0.6)
 
-    # Invert y-axis to have higher pressure (surface) at the bottom
+    ax[0].set_ylabel("Pressure (hPa)")
     ax[0].invert_yaxis()
     
-    # Add vertical line at 0 for reference
-    ax[0].axvline(0, color='black', linestyle='--', linewidth=1.0)
-    ax[1].axvline(0, color='black', linestyle='--', linewidth=1.0)
-
+    plt.tight_layout()
     plt.savefig(fig_path / "corr_profile.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -279,9 +305,7 @@ def main() -> None:
     # ------------------------------------------------
     
     # Extract the last 676 samples
-    # lw_recon has shape (nz, nsample), so we slice the columns
     lw_recon_last = lw_recon[:, -676:]
-    # lw_valid has shape (nsample, nz), so we slice the rows and transpose
     lw_valid_last = lw_valid[-676:, :].T
     
     samples = np.arange(676)
@@ -289,32 +313,35 @@ def main() -> None:
     fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
     
     # Panel 1: 2D Cross section
-    # Reconstructed data is the colormesh background
-    pcm = ax[0].pcolormesh(samples, lev, lw_recon_last, cmap="coolwarm", norm=TwoSlopeNorm(vcenter=0.0), shading='auto')
+    pcm = ax[0].pcolormesh(samples, lev, lw_recon_last, cmap="RdBu_r", norm=TwoSlopeNorm(vcenter=0.0), shading='nearest')
     
-    # Validating data is overlaid as contour lines
+    # Add negative contours (dashed) and positive contours (solid)
     levels = np.linspace(np.min(lw_valid_last), np.max(lw_valid_last), 9)
-    cs = ax[0].contour(samples, lev, lw_valid_last, levels=levels, colors='black', linewidths=0.8, alpha=0.8)
-    ax[0].clabel(cs, inline=True, fontsize=8, fmt='%.1f')
+    linestyles = ['--' if v < 0 else '-' for v in levels]
+    cs = ax[0].contour(samples, lev, lw_valid_last, levels=levels, colors='black', linewidths=1.0, alpha=0.8, linestyles=linestyles)
+    ax[0].clabel(cs, inline=True, fontsize=9, fmt='%.1f')
     
     ax[0].invert_yaxis()
     ax[0].set_ylabel("Pressure (hPa)")
     ax[0].set_xlabel("Sample Index (last 676)")
-    ax[0].set_title("LW Heating Rate: Reconstruction (Color) vs Validation (Contours)")
-    fig.colorbar(pcm, ax=ax[0], label="LW Heating Rate")
+    ax[0].set_title("LW Heating Rate: Recon (Color) vs Valid (Contours)")
+    
+    cbar = fig.colorbar(pcm, ax=ax[0], label="LW Heating Rate (K/day)", pad=0.02)
     
     # Panel 2: Mean Vertical Profile (1D)
     lw_recon_mean = np.mean(lw_recon_last, axis=1)
-    lw_valid_mean = np.mean(lw_valid_last, axis=1)
+    lw_valid_mean_1d = np.mean(lw_valid_last, axis=1)
     
-    ax[1].plot(lw_valid_mean, lev, color='black', label='Validation (Truth)', linewidth=2)
-    ax[1].plot(lw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2)
+    ax[1].plot(lw_valid_mean_1d, lev, color='black', label='Validation', linewidth=2.5, zorder=3)
+    ax[1].plot(lw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2.5, zorder=4)
     
-    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1)
-    ax[1].set_xlabel("Mean LW Heating Rate")
-    ax[1].set_title("Mean Vertical Profile (over 676 samples)")
+    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1.5, zorder=2)
+    ax[1].set_xlabel("Mean LW Heating (K/day)")
+    ax[1].set_title("Mean Vertical Profile")
     ax[1].legend()
+    ax[1].grid(True, linestyle=':', alpha=0.6)
     
+    plt.tight_layout()
     plt.savefig(fig_path / "lw_reconstruct_overlay.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -329,33 +356,35 @@ def main() -> None:
     fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
     
     # Panel 1: 2D Cross section
-    pcm_sw = ax[0].pcolormesh(samples, lev, sw_recon_last, cmap="coolwarm", norm=TwoSlopeNorm(vcenter=0.0), shading='auto')
+    pcm_sw = ax[0].pcolormesh(samples, lev, sw_recon_last, cmap="RdBu_r", norm=TwoSlopeNorm(vcenter=0.0), shading='nearest')
     
-    # Validating data is overlaid as contour lines
-    # Only contour if valid data has variance to prevent errors
     if np.ptp(sw_valid_last) > 0:
         levels_sw = np.linspace(np.min(sw_valid_last), np.max(sw_valid_last), 9)
-        cs_sw = ax[0].contour(samples, lev, sw_valid_last, levels=levels_sw, colors='black', linewidths=0.8, alpha=0.8)
-        ax[0].clabel(cs_sw, inline=True, fontsize=8, fmt='%.1f')
+        linestyles_sw = ['--' if v < 0 else '-' for v in levels_sw]
+        cs_sw = ax[0].contour(samples, lev, sw_valid_last, levels=levels_sw, colors='black', linewidths=1.0, alpha=0.8, linestyles=linestyles_sw)
+        ax[0].clabel(cs_sw, inline=True, fontsize=9, fmt='%.1f')
     
     ax[0].invert_yaxis()
     ax[0].set_ylabel("Pressure (hPa)")
     ax[0].set_xlabel("Sample Index (last 676)")
-    ax[0].set_title("SW Heating Rate: Reconstruction (Color) vs Validation (Contours)")
-    fig.colorbar(pcm_sw, ax=ax[0], label="SW Heating Rate")
+    ax[0].set_title("SW Heating Rate: Recon (Color) vs Valid (Contours)")
+    
+    cbar_sw = fig.colorbar(pcm_sw, ax=ax[0], label="SW Heating Rate (K/day)", pad=0.02)
     
     # Panel 2: Mean Vertical Profile (1D)
     sw_recon_mean = np.mean(sw_recon_last, axis=1)
-    sw_valid_mean = np.mean(sw_valid_last, axis=1)
+    sw_valid_mean_1d = np.mean(sw_valid_last, axis=1)
     
-    ax[1].plot(sw_valid_mean, lev, color='black', label='Validation (Truth)', linewidth=2)
-    ax[1].plot(sw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2)
+    ax[1].plot(sw_valid_mean_1d, lev, color='black', label='Validation', linewidth=2.5, zorder=3)
+    ax[1].plot(sw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2.5, zorder=4)
     
-    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1)
-    ax[1].set_xlabel("Mean SW Heating Rate")
-    ax[1].set_title("Mean Vertical Profile (over 676 samples)")
+    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1.5, zorder=2)
+    ax[1].set_xlabel("Mean SW Heating (K/day)")
+    ax[1].set_title("Mean Vertical Profile")
     ax[1].legend()
+    ax[1].grid(True, linestyle=':', alpha=0.6)
     
+    plt.tight_layout()
     plt.savefig(fig_path / "sw_reconstruct_overlay.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -365,6 +394,7 @@ def main() -> None:
 
     # save file
     save_path: Path = Path("/home/b11209013/KW_CloudSat/Files/Linear_Relation/")
+    os.makedirs(save_path, exist_ok=True)
 
     np.save(save_path / "M_lw.npy", M_lw)
     np.save(save_path / "M_sw.npy", M_sw)

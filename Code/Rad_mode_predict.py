@@ -177,7 +177,12 @@ def main() -> None:
     # file path
     output_path: Path = root_dir / "Files" / "Linear_Relation"
 
-    np.save(output_path / "regress_coeff.npy", np.array([lw_w1_coeff, lw_w2_coeff, sw_w1_coeff, sw_w2_coeff]))
+    output_arr: np.ndarray = np.array([lw_w1_coeff, lw_w2_coeff, sw_w1_coeff, sw_w2_coeff])
+
+    pprint(output_arr)
+
+    np.save(output_path / "regress_coeff.npy", output_arr)
+
 
 # ====================================================
 # Execute main function

@@ -230,7 +230,7 @@ def main(
     os.makedirs(save_path_t, exist_ok=True)
 
     np.save(save_path_w / f"k={k_min}~{k_max}.npy", w_comp)
-    np.save(save_path_t / f"k={k_min}~{k_max}.npy", w_comp)
+    np.save(save_path_t / f"k={k_min}~{k_max}.npy", t_comp)
 
 # ====================================================
 # Execute main function
@@ -249,8 +249,10 @@ if __name__ == "__main__":
     coords_global, omega_global, omega_anom_global = _get_subset(input_dir / "w" / "w_Itp_sub.nc")
     _, t_global, t_anom_global = _get_subset(input_dir / "t" / "t_Itp.nc")
 
-    # Calculate density via ideal gas law
-    rho: np.ndarray = coords_global["lev"][None, :, None] / 287.5 / t_global
+    # Calculate density via ideal gas law (convert hPa to Pa by multiplying by 100)
+    rho: np.ndarray = (coords_global["lev"][None, :, None] * 100.0) / 287.5 / t_global
+
+    print("maximum of density: ", rho.max())
 
     w_global     : np.ndarray = -omega_global / 9.81 / rho 
     w_anom_global: np.ndarray = w_global - np.nanmean(w_global, axis=0, keepdims=True)
