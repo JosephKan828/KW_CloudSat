@@ -39,6 +39,10 @@ The analysis is broken down into a five-step pipeline, implemented in the `Code/
 *   We apply the extracted Jacobian matrices to these idealized profiles to predict the associated radiative heating responses.
 *   The original and reconstructed profiles are then compared to visualize the coupling between distinct vertical dynamic modes and radiative heating.
 
+### Step 6: Radiative Heating Mode Verification (`Code/Rad_mode_verification.py`)
+*   Provides an additional layer of verification by projecting the full vertically composed dataset onto the theoretical vertical basis modes.
+*   Reconstructs the spatial heating anomalies for the entire validation dataset to evaluate the predictive accuracy of the idealized modes.
+
 ## 3. Verification Metrics
 
 The reconstructed heating rates are evaluated against the true validation subsets from CloudSat. Several metrics and visualizations are utilized:
@@ -62,6 +66,20 @@ We overlay the true validation data (contours) on top of the reconstructed data 
 Using idealized vertical modes, we visualize the contrast between the original (derived via basis decomposition) and reconstructed (derived via the Jacobian matrices) profiles of the radiative heating rates. This highlights how well the model predicts the radiative responses to pure vertical dynamic modes.
 
 ![Radiative Mode Prediction](Figure/Rad_mode_predict.png)
+
+### Mode Verification Scatter
+Scatter plot comparing the mode-reconstructed radiative heating profiles against the original CloudSat validating datasets, ensuring accuracy when filtered through the theoretical vertical modes.
+
+![Mode Verification Scatter](Figure/Rad_mode_verification/scatter_verify.png)
+
+### Mode Verification Cross-section
+Overlay of the validating data (contours) on top of the mode-reconstructed data (color shading) over the last 320 samples, demonstrating structural consistency.
+
+**Longwave Heating Verification:**
+![LW Mode Verification](Figure/Rad_mode_verification/lw_reconstruct_overlay.png)
+
+**Shortwave Heating Verification:**
+![SW Mode Verification](Figure/Rad_mode_verification/sw_reconstruct_overlay.png)
 
 ## 4. Quick Tour of Composite Structures
 
