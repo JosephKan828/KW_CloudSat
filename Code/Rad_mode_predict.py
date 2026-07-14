@@ -120,6 +120,8 @@ def main() -> None:
 
     # basis for J and T
     J_G_mat: np.ndarray = G_mat * (9.81/1004.5 - 0.0065)
+    
+    print(J_G_mat.shape)
 
     lw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*lw_w1)[:, None])
     sw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*sw_w1)[:, None])
@@ -141,27 +143,37 @@ def main() -> None:
     # ------------------------------------------------
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+    
+    # Calculate maximum absolute value to make the x-axis perfectly symmetric
+    all_vals = np.concatenate([
+        lw_w1.flatten(), lw_w1_recon.flatten(), sw_w1.flatten(), sw_w1_recon.flatten(),
+        lw_w2.flatten(), lw_w2_recon.flatten(), sw_w2.flatten(), sw_w2_recon.flatten()
+    ])
+    max_val = np.nanmax(np.abs(all_vals))
+    x_limit = max_val * 1.1 # Add 10% padding
 
     # Panel 1: Mode 1
     axes[0].plot(lw_w1, z, 'r-', linewidth=2, label="LW w1 (Orig)")
     axes[0].plot(lw_w1_recon.flatten(), z, 'r--', linewidth=2, label="LW w1 (Recon)")
     axes[0].plot(sw_w1, z, 'b-', linewidth=2, label="SW w1 (Orig)")
     axes[0].plot(sw_w1_recon.flatten(), z, 'b--', linewidth=2, label="SW w1 (Recon)")
-    axes[0].set_xlabel("Heating Rate (K/day)")
-    axes[0].set_ylabel("Height (m)")
-    axes[0].set_title("Mode 1 Radiative Heating")
-    axes[0].legend()
-    axes[0].grid(True, linestyle=':', alpha=0.6)
 
     # Panel 2: Mode 2
     axes[1].plot(lw_w2, z, 'r-', linewidth=2, label="LW w2 (Orig)")
     axes[1].plot(lw_w2_recon.flatten(), z, 'r--', linewidth=2, label="LW w2 (Recon)")
     axes[1].plot(sw_w2, z, 'b-', linewidth=2, label="SW w2 (Orig)")
     axes[1].plot(sw_w2_recon.flatten(), z, 'b--', linewidth=2, label="SW w2 (Recon)")
-    axes[1].set_xlabel("Heating Rate (K/day)")
+
+    for ax in axes:
+        ax.set_xlabel("Heating Rate (K/day)")
+        ax.set_xlim(-x_limit, x_limit)
+        ax.axvline(0, color='black', linestyle='-', linewidth=1.2, alpha=0.8, zorder=2)
+        ax.legend(loc='lower left')
+        ax.grid(True, linestyle=':', alpha=0.6)
+
+    axes[0].set_ylabel("Height (m)")
+    axes[0].set_title("Mode 1 Radiative Heating")
     axes[1].set_title("Mode 2 Radiative Heating")
-    axes[1].legend()
-    axes[1].grid(True, linestyle=':', alpha=0.6)
 
     plt.tight_layout()
     
