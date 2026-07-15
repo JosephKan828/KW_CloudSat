@@ -94,3 +94,13 @@ To better understand the composited wave structure (e.g., for Wavenumber 1~13):
 *   **Longwave and Shortwave Heating Anomalies:**
     
     ![QR Composite](Figure/QR_composite/k=1~13.png)
+
+## Appendix: Linear Regression Workflow (`QR_w_Relation.py`)
+
+The script computes the linear mapping between vertical motion ($w$) and radiative heating ($Q_{LW}$, $Q_{SW}$) via the following procedure:
+
+1. **Data Prep:** Loads, slices, and concatenates $w$, $Q_{LW}$, and $Q_{SW}$ arrays, splitting them into Training and Validation sets.
+2. **PLS Regression:** Trains Partial Least Squares (PLS) models (5 components) on the training set to map $w$ to heating rates.
+3. **Jacobian Extraction:** Extracts model coefficients as Jacobian matrices ($M_{LW}$, $M_{SW}$) that represent the linear transfer function ($Q' \approx M w'$).
+4. **Validation:** Reconstructs heating anomalies on the validation set, generating visual evaluations (heatmaps, correlation profiles, scatter plots, and cross-section overlays).
+5. **Output:** Saves the Jacobian matrices as numpy binaries for downstream mode predictions.
