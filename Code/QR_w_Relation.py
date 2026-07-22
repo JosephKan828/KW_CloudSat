@@ -12,19 +12,6 @@ from optparse import Values
 import os
 import sys
 
-from numpy.ma.core import shrink_mask
-
-# Define target CPU/thread limit
-MAX_CPUS = 4
-
-# Set thread limit for major libraries
-cpu_limit_str = str(MAX_CPUS)
-os.environ["OMP_NUM_THREADS"] = cpu_limit_str
-os.environ["MKL_NUM_THREADS"] = cpu_limit_str
-os.environ["OPENBLAS_NUM_THREADS"] = cpu_limit_str
-os.environ["VECLIB_MAXIMUM_THREADS"] = cpu_limit_str
-os.environ["NUMEXPR_NUM_THREADS"] = cpu_limit_str
-
 # Import package
 import sys
 import numpy as np
@@ -91,10 +78,8 @@ def main() -> None:
     # Load vertical motion as dictionary
     fname_w: List[str] = list(glob(str(input_dir / "w_composite/*.npy")))
 
-    dx: float = 360.0 / 576.0 
-
     w: Dict[str, np.ndarray] = {
-            fname.split("/")[-1].split(".")[0]: np.load(fname)[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1].split(".")[0]: np.load(fname)[...]
             for fname in fname_w
             }
 
@@ -104,12 +89,12 @@ def main() -> None:
     fname_qr: List[str] = list(glob(str(input_dir / "QR_composite/k*")))
 
     lw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+"/LW.npy")[...]
             for fname in fname_qr
             }
 
     sw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+"/SW.npy")[...]
             for fname in fname_qr
             }
 
@@ -138,9 +123,9 @@ def main() -> None:
     # Split data into training and verifying
     # ------------------------------------------------
 
-    w_train : np.ndarray = w_concat[:nx*5] ; w_valid : np.ndarray = w_concat[nx*5:]
-    lw_train: np.ndarray = lw_concat[:nx*5]; lw_valid: np.ndarray = lw_concat[nx*5:]
-    sw_train: np.ndarray = sw_concat[:nx*5]; sw_valid: np.ndarray = sw_concat[nx*5:]
+    w_train : np.ndarray = w_concat[:nx*6] ; w_valid : np.ndarray = w_concat[nx*6:]
+    lw_train: np.ndarray = lw_concat[:nx*6]; lw_valid: np.ndarray = lw_concat[nx*6:]
+    sw_train: np.ndarray = sw_concat[:nx*6]; sw_valid: np.ndarray = sw_concat[nx*6:]
 
     # ------------------------------------------------
     # Use Partial Least Squares (PLS) regression
@@ -148,10 +133,10 @@ def main() -> None:
 
     from sklearn.cross_decomposition import PLSRegression
     
-    # Fit PLS models for LW and SW (using 5 components)
+    # Fit PLS models for LW and SW (using 4 components)
     # scale=False means it will center the data but not normalize by standard deviation
-    pls_lw = PLSRegression(n_components=5, scale=False)
-    pls_sw = PLSRegression(n_components=5, scale=False)
+    pls_lw = PLSRegression(n_components=4, scale=False)
+    pls_sw = PLSRegression(n_components=4, scale=False)
     
     pls_lw.fit(w_train, lw_train)
     pls_sw.fit(w_train, sw_train)
@@ -312,7 +297,7 @@ def main() -> None:
     lw_recon_last = lw_recon
     lw_valid_last = lw_valid.T
     
-    samples = np.arange(nx*2)
+    samples = np.arange(nx)
     
     fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
     
