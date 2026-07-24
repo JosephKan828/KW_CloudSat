@@ -51,7 +51,7 @@ def _get_subset(
         time_vals = pd.to_datetime(ds_xr['time'].values)
         lat_vals = ds_xr['lat'].values
         lon_vals = ds_xr['lon'].values
-        lev_name = 'lev' if 'lev' in ds_xr.coords else 'level'
+        lev_name = 'plev' if 'plev' in ds_xr.coords else 'level'
         lev_vals = ds_xr[lev_name].values
         
     # Assign coordinate limits
@@ -71,7 +71,8 @@ def _get_subset(
                 key for key in ds.variables.keys()
                 if key not in ds.dimensions.keys()
                 ]
-        var = ds.variables[var_keys[0]]
+
+        var = ds.variables[var_keys[-1]]
 
         # Build dynamic slice object based on dimension order
         slices = []
@@ -147,6 +148,10 @@ def main(
     w_comp: np.ndarray = np.nanmean(w_roll, axis=0)
     t_comp: np.ndarray = np.nanmean(t_roll, axis=0)
 
+    # concatenate along event
+    w_conc: np.ndarray = np.array([w_roll[i] for i in range(w_roll.shape[0])])
+    t_conc: np.ndarray = np.array([t_roll[i] for i in range(t_roll.shape[0])])
+
     # convolve over longitude
     w_comp = convolve1d(w_comp, np.ones(33)/33, axis=-1, mode="reflect")
     t_comp = convolve1d(t_comp, np.ones(33)/33, axis=-1, mode="reflect")
@@ -180,7 +185,7 @@ def main(
     ax.set_xlabel("Lag [degrees]")
     ax.set_ylabel("Pressure [hPa]")
     ax.set_title("w Composite Anomaly")
-    fig.colorbar(w_cf, ax=ax, orientation="horizontal", pad=0.12, label="Pa/s")
+    fig.colorbar(w_cf, ax=ax, orientation="horizontal", pad=0.12, label="m/s")
 
     # Save figure
     output_dir = Path("/home/b11209013/KW_CloudSat/Figure/w_composite")
@@ -223,14 +228,21 @@ def main(
     # ------------------------------------------------
     # Save Files
     # ------------------------------------------------
-    save_path_w: Path = Path( f"/home/b11209013/KW_CloudSat/Files/w_composite")
-    save_path_t: Path = Path( f"/home/b11209013/KW_CloudSat/Files/t_composite")
-    
-    os.makedirs(save_path_w, exist_ok=True)
-    os.makedirs(save_path_t, exist_ok=True)
+    comp_path_w: Path = Path( f"/home/b11209013/KW_CloudSat/Files/w_composite/")
+    comp_path_t: Path = Path( f"/home/b11209013/KW_CloudSat/Files/t_composite/")
 
-    np.save(save_path_w / f"k={k_min}~{k_max}.npy", w_comp)
-    np.save(save_path_t / f"k={k_min}~{k_max}.npy", t_comp)
+    conc_path_w: Path = Path(f"/home/b11209013/KW_CloudSat/Files/w_concate/")
+    conc_path_t: Path = Path(f"/home/b11209013/KW_CloudSat/Files/t_concate/")
+
+    os.makedirs(comp_path_w, exist_ok=True)
+    os.makedirs(comp_path_t, exist_ok=True)
+    os.makedirs(conc_path_w, exist_ok=True)
+    os.makedirs(conc_path_t, exist_ok=True)
+
+    np.save(comp_path_w / f"k={k_min}~{k_max}.npy", w_comp)
+    np.save(comp_path_t / f"k={k_min}~{k_max}.npy", t_comp)
+    np.save(conc_path_w / f"k={k_min}~{k_max}.npy", w_conc)
+    np.save(conc_path_t / f"k={k_min}~{k_max}.npy", t_conc)
 
 # ====================================================
 # Execute main function
@@ -246,16 +258,18 @@ if __name__ == "__main__":
     input_dir: Path = Path("/data92/b11209013/ERA5/")
     
     # Use the refactored helper function to load and process data
-    coords_global, omega_global, omega_anom_global = _get_subset(input_dir / "w" / "w_Itp_sub.nc")
-    _, t_global, t_anom_global = _get_subset(input_dir / "t" / "t_Itp.nc")
+    coords_global, omega_global, omega_anom_global = _get_subset(input_dir / "w" / "w_merged_Itp.nc")
+    _, t_global, t_anom_global = _get_subset(input_dir / "t" / "t_merged_Itp.nc")
 
     # Calculate density via ideal gas law (convert hPa to Pa by multiplying by 100)
-    rho: np.ndarray = (coords_global["lev"][None, :, None] * 100.0) / 287.5 / t_global
+    rho: np.ndarray = (coords_global["lev"][None, :, None]) / 287.5 / t_global
 
     print("maximum of density: ", rho.max())
 
     w_global     : np.ndarray = -omega_global / 9.81 / rho 
     w_anom_global: np.ndarray = w_global - np.nanmean(w_global, axis=0, keepdims=True)
+
+    print(np.nanmax(w_anom_global))
 
     # execute composite
     for (k_min, k_max) in zip(k_mins, k_maxs):

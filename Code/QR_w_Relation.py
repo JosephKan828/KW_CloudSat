@@ -89,12 +89,12 @@ def main() -> None:
     fname_qr: List[str] = list(glob(str(input_dir / "QR_composite/k*")))
 
     lw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/LW.npy")[...]
+            fname.split("/")[-1]: np.load(fname+"/concat/LW.npy")[...]
             for fname in fname_qr
             }
 
     sw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/SW.npy")[...]
+            fname.split("/")[-1]: np.load(fname+"/concat/SW.npy")[...]
             for fname in fname_qr
             }
 

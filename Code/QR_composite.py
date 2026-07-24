@@ -80,6 +80,10 @@ def main(
     LW_comp: np.ndarray = np.nanmean(LW_roll, axis=0)
     SW_comp: np.ndarray = np.nanmean(SW_roll, axis=0)
 
+    # concatenate along events
+    LW_concat: np.ndarray = np.array([LW_roll[i] for i in range(LW_roll.shape[0])])
+    SW_concat: np.ndarray = np.array([SW_roll[i] for i in range(SW_roll.shape[0])])
+
     # convolve over longitude
     LW_comp: np.ndarray = convolve1d(LW_comp, np.ones(33)/33, axis=-1, mode="reflect")
     SW_comp: np.ndarray = convolve1d(SW_comp, np.ones(33)/33, axis=-1, mode="reflect")
@@ -145,10 +149,17 @@ def main(
     # Save Files
     # ------------------------------------------------
     save_path: Path = Path( f"/home/b11209013/KW_CloudSat/Files/QR_composite/k={k_min}~{k_max}")
-    os.makedirs(save_path, exist_ok=True)
+    comp_path: Path = save_path / "composite"
+    conc_path: Path = save_path / "concat"
 
-    np.save(save_path / f"LW.npy", LW_comp)
-    np.save(save_path / f"SW.npy", SW_comp)
+    os.makedirs(save_path, exist_ok=True)
+    os.makedirs(comp_path, exist_ok=True)
+    os.makedirs(conc_path, exist_ok=True)
+
+    np.save(comp_path / "LW.npy", LW_comp)
+    np.save(comp_path / "SW.npy", SW_comp)
+    np.save(conc_path / "LW.npy", LW_concat)
+    np.save(conc_path / "SW.npy", SW_concat)
 
 # ====================================================
 # Execute main function
