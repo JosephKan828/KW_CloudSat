@@ -165,6 +165,15 @@ def main() -> None:
     print(f"M_sw shape: {M_sw.shape}")
 
     # ------------------------------------------------
+    # Save Jacobian Matrices
+    # ------------------------------------------------
+    jacobian_dir: Path = Path("/home/b11209013/KW_CloudSat/Files/Linear_Relation_new/")
+    os.makedirs(jacobian_dir, exist_ok=True)
+    np.save(jacobian_dir / "M_lw.npy", M_lw)
+    np.save(jacobian_dir / "M_sw.npy", M_sw)
+    print(f"Jacobian matrices saved to {jacobian_dir}")
+
+    # ------------------------------------------------
     # Testing & Scatter Plot Visualization
     # ------------------------------------------------
     
