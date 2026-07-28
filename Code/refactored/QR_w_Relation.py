@@ -280,10 +280,6 @@ def main(data_type: str) -> None:
     pprint(stats_df['corr_lw'].describe())
     pprint("\nSW Correlation Summary:")
     pprint(stats_df['corr_sw'].describe())
-
-    stats_path = fig_path / "correlation_profile_stats.csv"
-    stats_df.to_csv(stats_path, index=False, float_format='%.4f')
-    pprint(f"\nCorrelation statistics saved to {stats_path}\n")
     
     # ------------------------------------------------
     # Visualize the Correlation Score Profile
@@ -320,6 +316,10 @@ def main(data_type: str) -> None:
     folder_name = "Linear_Relation"
     save_path: Path = root_dir / "Files" / folder_name / data_type
     os.makedirs(save_path, exist_ok=True)
+
+    stats_path = save_path / "correlation_profile_stats.csv"
+    stats_df.to_csv(stats_path, index=False, float_format='%.4f')
+    pprint(f"\nCorrelation statistics saved to {stats_path}\n")
 
     np.save(save_path / "M_lw.npy", M_lw)
     np.save(save_path / "M_sw.npy", M_sw)
