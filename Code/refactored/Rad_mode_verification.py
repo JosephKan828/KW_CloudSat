@@ -48,7 +48,13 @@ def main(data_type: str) -> None:
     file_dir: Path = root_dir / "Files"
 
     # Load vertical motion as dictionary
-    fname_w: List[str] = list(glob(str(file_dir / "w_composite/*.npy")))
+    match data_type:
+        case "concat":
+            fname_w: List[str] = list(glob(str(file_dir / "w_concate/*.npy")))
+        case "composite":
+            fname_w: List[str] = list(glob(str(file_dir / "w_composite/*.npy")))
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     dx: float = 360.0 / 576.0 
 
@@ -60,32 +66,20 @@ def main(data_type: str) -> None:
     nz, nx = w["k=1~3"].shape
 
     # Load regression coefficient
-    folder_name = "Linear_Relation" if data_type == "concat" else "Linear_Relation_new"
-    reg_coeff: np.ndarray = np.load(file_dir / folder_name / "regress_coeff.npy").squeeze()
+    reg_coeff: np.ndarray = np.load(file_dir / "Linear_Relation" / data_type / "regress_coeff.npy").squeeze()
     
     # Load radiative heating profile
     fname_qr: List[str] = list(glob(str(file_dir / "QR_composite/k*")))
 
-    if data_type == "concat":
-        lw_valid: Dict[str, np.ndarray] = {
-                fname.split("/")[-1]: np.load(fname+"/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
-                for fname in fname_qr
-                }
+    lw_valid: Dict[str, np.ndarray] = {
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            for fname in fname_qr
+            }
 
-        sw_valid: Dict[str, np.ndarray] = {
-                fname.split("/")[-1]: np.load(fname+"/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
-                for fname in fname_qr
-                }
-    else:
-        lw_valid: Dict[str, np.ndarray] = {
-                fname.split("/")[-1]: np.load(fname+"/composite/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
-                for fname in fname_qr
-                }
-
-        sw_valid: Dict[str, np.ndarray] = {
-                fname.split("/")[-1]: np.load(fname+"/composite/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
-                for fname in fname_qr
-                }
+    sw_valid: Dict[str, np.ndarray] = {
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            for fname in fname_qr
+            }
 
 
     # ------------------------------------------------
@@ -146,10 +140,10 @@ def main(data_type: str) -> None:
     # reconstruct to vertical profile
     # ------------------------------------------------
 
-    lw1_z: np.ndarray = np.einsum("s,z->sz", lw1, G1) * (9.8/1004.5 - 0.0065)
-    lw2_z: np.ndarray = np.einsum("s,z->sz", lw2, G2) * (9.8/1004.5 - 0.0065)
-    sw1_z: np.ndarray = np.einsum("s,z->sz", sw1, G1) * (9.8/1004.5 - 0.0065)
-    sw2_z: np.ndarray = np.einsum("s,z->sz", sw2, G2) * (9.8/1004.5 - 0.0065)
+    lw1_z: np.ndarray = np.einsum("s,z->sz", lw1, G1) * (9.81/1004.5 - 0.0065)
+    lw2_z: np.ndarray = np.einsum("s,z->sz", lw2, G2) * (9.81/1004.5 - 0.0065)
+    sw1_z: np.ndarray = np.einsum("s,z->sz", sw1, G1) * (9.81/1004.5 - 0.0065)
+    sw2_z: np.ndarray = np.einsum("s,z->sz", sw2, G2) * (9.81/1004.5 - 0.0065)
 
     lw_z: np.ndarray = (lw1_z + lw2_z) / rho[None, :]
     sw_z: np.ndarray = (sw1_z + sw2_z) / rho[None, :]
@@ -197,8 +191,7 @@ def main(data_type: str) -> None:
         axes[i].grid(True, linestyle=':', alpha=0.6)
 
     plt.tight_layout()
-    fig_folder = "Rad_mode_verification" if data_type == "concat" else "Rad_mode_verification_new"
-    fig_path = root_dir / "Figure" / fig_folder
+    fig_path = root_dir / "Figure" / "Rad_mode_verification" / data_type
     os.makedirs(fig_path, exist_ok=True)
     plt.savefig(fig_path / "scatter_verify.png", dpi=300, bbox_inches="tight")
     plt.close(fig)

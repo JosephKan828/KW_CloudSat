@@ -43,9 +43,14 @@ def main(data_type: str) -> None:
     # Load Jacobian Matrix
     # ------------------------------------------------
 
-    root_dir : Path = Path("/home/b11209013/KW_CloudSat/")
-    folder_name = "Linear_Relation" if data_type == "concat" else "Linear_Relation_new"
-    input_dir: Path = root_dir / "Files" / folder_name
+    root_dir: Path = Path("/home/b11209013/KW_CloudSat/")
+
+    match data_type:
+        case "concat" | "composite":
+            input_dir = root_dir / "Files" / "Linear_Relation" / data_type
+            fig_name = f"Rad_mode_predict_{data_type}.png"
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     M_lw: np.ndarray = np.load(input_dir / "M_lw.npy")
     M_sw: np.ndarray = np.load(input_dir / "M_sw.npy")
@@ -162,7 +167,7 @@ def main(data_type: str) -> None:
 
     plt.tight_layout()
     
-    save_path = root_dir / "Figure" / "Rad_mode_predict.png"
+    save_path = root_dir / "Figure" / fig_name
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"Visualization saved to {save_path}")
@@ -172,8 +177,7 @@ def main(data_type: str) -> None:
     # ------------------------------------------------
 
     # file path
-    folder_name = "Linear_Relation" if data_type == "concat" else "Linear_Relation_new"
-    output_path: Path = root_dir / "Files" / folder_name
+    output_path = input_dir
 
     output_arr: np.ndarray = np.array([lw_w1_coeff, lw_w2_coeff, sw_w1_coeff, sw_w2_coeff])
 

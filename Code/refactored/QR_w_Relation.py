@@ -137,8 +137,8 @@ def main(data_type: str) -> None:
     # Extract Jacobian Matrices (equivalent to the M_lw and M_sw matrices)
     # PLS prediction is internally: Y_pred = (X - X_mean) @ coef_ + Y_mean
     # Since we want M_lw such that M_lw @ w.T matches this, we transpose coef_
-    M_lw: np.ndarray = pls_lw.coef_
-    M_sw: np.ndarray = pls_sw.coef_
+    M_lw: np.ndarray = pls_lw.coef_.T
+    M_sw: np.ndarray = pls_sw.coef_.T
 
     # ------------------------------------------------
     # Verifying

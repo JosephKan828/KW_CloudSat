@@ -3,6 +3,9 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
+# Change to the directory where the script is located
+cd "$(dirname "$0")"
+
 # ====================================================
 # Parse Command Line Arguments (The Switcher)
 # ====================================================
