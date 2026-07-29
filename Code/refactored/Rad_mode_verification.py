@@ -56,14 +56,18 @@ def main(data_type: str) -> None:
         case _:
             raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
-    dx: float = 360.0 / 576.0 
-
     w: Dict[str, np.ndarray] = {
-            fname.split("/")[-1].split(".")[0]: np.load(fname)[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1].split(".")[0]: np.load(fname)[...]
             for fname in fname_w
             }
 
-    nz, nx = w["k=1~3"].shape
+    match data_type:
+        case "concat":
+            _, nz, nx = w["k=1~3"].shape
+        case "composite":
+            nz, nx = w["k=1~3"].shape
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # Load regression coefficient
     reg_coeff: np.ndarray = np.load(file_dir / "Linear_Relation" / data_type / "regress_coeff.npy").squeeze()
@@ -72,12 +76,12 @@ def main(data_type: str) -> None:
     fname_qr: List[str] = list(glob(str(file_dir / "QR_composite/k*")))
 
     lw_valid: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+f"/{data_type}/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/LW.npy")[...]
             for fname in fname_qr
             }
 
     sw_valid: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+f"/{data_type}/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/SW.npy")[...]
             for fname in fname_qr
             }
 
@@ -102,17 +106,27 @@ def main(data_type: str) -> None:
     # ------------------------------------------------
 
     keys = sorted(w.keys())
-    w_concat: np.ndarray = np.concatenate([
-        w[k].T for k in keys
-        ])
+    
+    match data_type:
+        case "concat":
+            w_concat: np.ndarray = np.concatenate([w[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            lw_concat: np.ndarray = np.concatenate([lw_valid[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            sw_concat: np.ndarray = np.concatenate([sw_valid[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
 
-    lw_concat: np.ndarray = np.concatenate([
-        lw_valid[k].T for k in keys
-        ])
+            lw_non_nan : np.ndarray = np.all(~np.isnan(lw_concat), axis=1)
+            sw_non_nan : np.ndarray = np.all(~np.isnan(sw_concat), axis=1)
+            non_nan_idx: np.ndarray = lw_non_nan & sw_non_nan
 
-    sw_concat: np.ndarray = np.concatenate([
-        sw_valid[k].T for k in keys
-        ])
+            w_concat = w_concat[non_nan_idx]
+            lw_concat = lw_concat[non_nan_idx]
+            sw_concat = sw_concat[non_nan_idx]
+
+        case "composite":
+            w_concat: np.ndarray = np.concatenate([w[k].T for k in keys])
+            lw_concat: np.ndarray = np.concatenate([lw_valid[k].T for k in keys])
+            sw_concat: np.ndarray = np.concatenate([sw_valid[k].T for k in keys])
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # ------------------------------------------------
     # Project data onto basis
