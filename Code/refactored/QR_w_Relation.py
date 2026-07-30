@@ -95,9 +95,19 @@ def main(data_type: str) -> None:
             sw_non_nan : np.ndarray = np.all(~np.isnan(sw_concat), axis=1)
             non_nan_idx: np.ndarray = lw_non_nan & sw_non_nan
 
-            w_concat = w_concat[non_nan_idx]
-            lw_concat = lw_concat[non_nan_idx]
-            sw_concat = sw_concat[non_nan_idx]
+            # Calculate standard derivation in LW and SW heating
+            lw_std: float = float(np.nanstd(lw_concat[non_nan_idx, :]))
+            sw_std: float = float(np.nanstd(sw_concat[non_nan_idx, :]))
+
+            lw_norm_idx: np.ndarray = np.all(np.abs(lw_concat[non_nan_idx, :]) < 3 * lw_std, axis=1)
+            sw_norm_idx: np.ndarray = np.all(np.abs(sw_concat[non_nan_idx, :]) < 3 * sw_std, axis=1) 
+            norm_idx: np.ndarray = lw_norm_idx & sw_norm_idx
+            
+            w_concat = w_concat[non_nan_idx, :][norm_idx, :]
+            lw_concat = lw_concat[non_nan_idx, :][norm_idx, :]
+            sw_concat = sw_concat[non_nan_idx, :][norm_idx, :]
+
+            print(w_concat.shape)
 
         case "composite":
             w_concat: np.ndarray = np.concatenate([w[k].T for k in keys])
