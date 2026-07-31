@@ -147,10 +147,10 @@ def main(data_type: str) -> None:
     print(w_train.shape, lw_train.shape, sw_train.shape)
     
     # Extract Jacobian Matrices (equivalent to the M_lw and M_sw matrices)
-    # PLS prediction is internally: Y_pred = (X - X_mean) @ coef_ + Y_mean
-    # Since we want M_lw such that M_lw @ w.T matches this, we transpose coef_
-    M_lw: np.ndarray = pls_lw.coef_.T
-    M_sw: np.ndarray = pls_sw.coef_.T
+    # In scikit-learn >= 1.2, PLS prediction is internally: Y_pred = (X - X_mean) @ coef_.T + Y_mean
+    # Since we want M_lw such that M_lw @ w.T matches this, M_lw is exactly coef_ (no transpose needed).
+    M_lw: np.ndarray = pls_lw.coef_
+    M_sw: np.ndarray = pls_sw.coef_
 
     # ------------------------------------------------
     # Verifying
