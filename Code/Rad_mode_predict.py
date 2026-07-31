@@ -80,8 +80,8 @@ def main(data_type: str) -> None:
 
     p_era5 : np.ndarray = np.linspace(1000.0, 100.0, 37) # pressure level in ERA5
 
-    w1_era5: np.ndarray = interp1d(p/100.0, w1, fill_value="extrapolate")(p_era5)
-    w2_era5: np.ndarray = interp1d(p/100.0, w2, fill_value="extrapolate")(p_era5)
+    w1_era5: np.ndarray = interp1d(p/100.0, w1, fill_value="extrapolate")(p_era5) #type: ignore
+    w2_era5: np.ndarray = interp1d(p/100.0, w2, fill_value="extrapolate")(p_era5) #type: ignore
     # ------------------------------------------------
     # predict radiation through Jacobian Matrix
     # ------------------------------------------------
@@ -97,11 +97,11 @@ def main(data_type: str) -> None:
     # coordinate
     # ------------------------------------------------
 
-    lw_w1: np.ndarray = interp1d(p_era5, lw_w1_era5, fill_value="extrapolate")(p/100.0)
-    sw_w1: np.ndarray = interp1d(p_era5, sw_w1_era5, fill_value="extrapolate")(p/100.0)
+    lw_w1: np.ndarray = interp1d(p_era5, lw_w1_era5, fill_value="extrapolate")(p/100.0)  # type: ignore
+    sw_w1: np.ndarray = interp1d(p_era5, sw_w1_era5, fill_value="extrapolate")(p/100.0)  # type: ignore
 
-    lw_w2: np.ndarray = interp1d(p_era5, lw_w2_era5, fill_value="extrapolate")(p/100.0)
-    sw_w2: np.ndarray = interp1d(p_era5, sw_w2_era5, fill_value="extrapolate")(p/100.0)
+    lw_w2: np.ndarray = interp1d(p_era5, lw_w2_era5, fill_value="extrapolate")(p/100.0)  # type: ignore
+    sw_w2: np.ndarray = interp1d(p_era5, sw_w2_era5, fill_value="extrapolate")(p/100.0)  # type: ignore
 
     # ------------------------------------------------
     # Decompose radiative heating rate

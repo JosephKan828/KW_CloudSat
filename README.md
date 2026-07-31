@@ -1,106 +1,92 @@
-# KW_CloudSat: Kelvin Wave Radiative-Dynamic Coupling Analysis
+# KW_CloudSat: Kelvin Wave Radiative-Dynamic Coupling Pipeline
 
-This project investigates the radiative-dynamic coupling associated with equatorially trapped Kelvin Waves (KWs). By combining Satellite Outgoing Longwave Radiation (OLR), ERA5 Reanalysis kinematics, and CloudSat radiative heating profiles, we isolate KW events and extract the linear relationship between vertical motion ($w$) and radiative heating rates ($Q_{LW}$, $Q_{SW}$).
+## 1. Introduction
 
-## 1. Datasets and Variables
+The **KW_CloudSat** project is a data analysis pipeline designed to quantify the radiative-dynamic coupling of equatorially trapped Kelvin Waves (KWs). By synthesizing satellite observations and atmospheric reanalysis data, the system extracts the linear transfer function between kinematic vertical motion ($w$) and atmospheric radiative heating rates ($Q_{LW}$, $Q_{SW}$).
 
-The project synthesizes three major datasets over the period of 2006–2017 for the equatorial band (5°S–5°N).
+To provide a robust evaluation under different signal-to-noise ratios, the pipeline implements two distinct analytical procedures: **Concat** (retaining event-to-event variance) and **Composite** (averaging to isolate the mean wave signal).
 
-*   **Satellite OLR Data:**
-    *   **Variable:** Outgoing Longwave Radiation (OLR) Anomaly.
-    *   **Purpose:** To filter and identify convectively coupled Kelvin wave events.
-*   **ERA5 Reanalysis:**
-    *   **Variables:** Pressure velocity ($\omega$) and Temperature ($T$).
-    *   **Purpose:** To derive kinematic vertical velocity ($w$) and provide atmospheric dynamic context.
-*   **CloudSat (Gridded):**
-    *   **Variables:** Longwave Heating Rate ($Q_{LW}$) and Shortwave Heating Rate ($Q_{SW}$).
-    *   **Purpose:** To provide vertical profiles of radiative heating rates associated with the KW events.
+## 2. Data Architecture
 
-## 2. Methodology
+The pipeline ingests and synthesizes three primary datasets covering the equatorial band (5°S–5°N) for the 2006–2017 period:
 
-The analysis is broken down into a five-step pipeline, implemented in the `Code/` directory:
+*   **Satellite OLR (Outgoing Longwave Radiation):** Acts as the primary signal to filter and identify convectively coupled Kelvin wave events.
+*   **ERA5 Reanalysis:** Provides background kinematic data. Pressure velocity ($\omega$) and Temperature ($T$) are ingested to derive physical vertical velocity ($w$).
+*   **CloudSat 2B-FLXHR-LIDAR:** Gridded vertical profiles of Longwave ($Q_{LW}$) and Shortwave ($Q_{SW}$) heating rates associated with the KW events.
 
-### Step 1: Kelvin Wave Event Selection (`Code/KW_selection.py`)
-*   **Filtering:** OLR data is symmetrized around the equator and passed through a Space-Time filter to isolate Kelvin waves (equivalent depth $h = 8-90$ m, period $T = 2.5-30$ days, varying wavenumber bands $k$).
-*   **Event Identification:** A local minimum filter (7 days $\times$ 31 degrees footprint) is applied. Events are flagged where the filtered OLR reaches a local minimum and exceeds a significance threshold ($-2.77\sigma$).
+## 3. Methodology & Pipeline Architecture
 
-### Step 2 & 3: Compositing Dynamics and Radiative Heating (`Code/ERA5_composite.py`, `Code/QR_composite.py`)
-*   Using the indices identified in Step 1, we extract and composite the ERA5 thermodynamic fields and CloudSat radiative heating profiles.
-*   For ERA5, pressure velocity ($\omega$) is converted to vertical velocity ($w$) using the ideal gas law and temperature profiles.
-*   The composited fields are convolved over longitude for smoothing.
+The system executes a multi-stage data processing pipeline located in the `Code/` directory.
 
-### Step 4: Extracting Linear Relations via PLS Regression (`Code/QR_w_Relation.py`)
-*   We attempt to express the radiative heating anomalies ($Q'_{LW}$, $Q'_{SW}$) as a linear map of the vertical motion profile ($w'$).
-*   **Model:** Partial Least Squares (PLS) regression (with 5 components) is applied to extract the Jacobian matrices ($M_{LW}$ and $M_{SW}$), where $Q' \approx M w'$.
-*   The dataset is split into training and validation sets to verify the robustness of the reconstruction.
+### Phase 1: Event Identification (`Code/KW_selection.py`)
+*   **Filtering:** Symmetrizes OLR data across the equator and applies a Space-Time bandpass filter targeting the theoretical Kelvin wave dispersion curves (equivalent depth $h = 8-90$ m, period $T = 2.5-30$ days).
+*   **Triggering:** Uses a 2D minimum filter (7 days $\times$ 31 degrees) to detect local minima. An event is flagged if it passes a $-2.77\sigma$ significance threshold.
 
-### Step 5: Radiative Heating Mode Prediction (`Code/Rad_mode_predict.py`)
-*   To further validate and interpret the linear relations, we construct idealized vertical motion profiles representing the first and second baroclinic modes (Mode 1 and Mode 2).
-*   We apply the extracted Jacobian matrices to these idealized profiles to predict the associated radiative heating responses.
-*   The original and reconstructed profiles are then compared to visualize the coupling between distinct vertical dynamic modes and radiative heating.
+### Phase 2: Data Extraction & Preprocessing (`Code/ERA5_composite.py`, `Code/QR_composite.py`)
+*   Extracts 3D spatial subsets of ERA5 and CloudSat data corresponding to the identified KW event indices.
+*   Performs thermodynamic conversions (e.g., $\omega$ to $w$ via the ideal gas law).
+*   Applies a 1D spatial convolution over longitude to smooth the extracted fields.
 
-### Step 6: Radiative Heating Mode Verification (`Code/Rad_mode_verification.py`)
-*   Provides an additional layer of verification by projecting the full vertically composed dataset onto the theoretical vertical basis modes.
-*   Reconstructs the spatial heating anomalies for the entire validation dataset to evaluate the predictive accuracy of the idealized modes.
+### Phase 3: Linear Mapping & Regression (`Code/QR_w_Relation.py`)
+*   **Objective:** Model radiative heating anomalies as a linear function of vertical motion: $Q' \approx M w'$.
+*   **Implementation:** Leverages Partial Least Squares (PLS) regression (n_components=5) to compute the Jacobian matrices ($M_{LW}$ and $M_{SW}$).
+*   Splits the data strictly into Training and Validation sets to prevent data leakage.
 
-## 3. Verification Metrics
+### Phase 4: Model Prediction & Verification (`Code/Rad_mode_predict.py`, `Code/Rad_mode_verification.py`)
+*   Projects the extracted Jacobian matrices onto idealized first and second baroclinic modes to predict idealized radiative responses.
+*   Reconstructs spatial heating anomalies on the validation dataset and evaluates the model against the true CloudSat observations.
 
-The reconstructed heating rates are evaluated against the true validation subsets from CloudSat. Several metrics and visualizations are utilized:
+## 4. Analytical Procedures: Concat vs. Composite
 
-### Correlation Profile
-The model's accuracy is evaluated vertically. We calculate the Pearson Correlation Coefficient ($R$) between the reconstructed and the true radiative heating at each pressure level.
+The pipeline can be executed in two distinct modes, controlled via a command-line argument. These modes dictate how the regression model treats the underlying data.
 
-![Correlation Profile](Figure/QR_w_Relation/corr_profile.png)
+### 4.1. Concat Procedure (`--mode concat`)
+*   **Mechanism:** All identified KW events are concatenated along a sequential axis. The PLS regression is trained on the raw, un-averaged timeseries.
+*   **Engineering Trade-offs:**
+    *   *Pros:* The model is exposed to the full variance of the dataset, including local convective blow-ups, non-linear interactions, and high-frequency weather noise.
+    *   *Cons:* The resulting Jacobian matrices ($M$) are inherently noisier. Overall correlation scores ($R^2$) are lower because predicting stochastic noise is difficult, but the model is more representative of raw physical variance.
 
-### Scatter and Overall Correlation
-The overall scatter of reconstruction against validation data provides the aggregate $R$ score for both Longwave and Shortwave components.
+### 4.2. Composite Procedure (`--mode composite`)
+*   **Mechanism:** All KW events are phase-aligned and averaged relative to lag 0. The PLS regression is trained on this single, smoothed "composite" wave footprint.
+*   **Engineering Trade-offs:**
+    *   *Pros:* Effectively cancels out random convective noise and isolates the "pure" theoretical Kelvin Wave signal. Results in highly accurate reconstructions and clean, deterministic Jacobian matrices.
+    *   *Cons:* Over-smooths the dataset. The resulting matrices may overestimate the linear predictability of real-time, individual weather events.
 
-![Scatter Verification](Figure/QR_w_Relation/verify.png)
+## 5. Execution
 
-### Cross-section Reconstruction vs. Validation
-We overlay the true validation data (contours) on top of the reconstructed data (color mesh) for the last 676 samples. This demonstrates the model's physical consistency in capturing the vertical tilt and structure of the heating rates.
+The pipeline is orchestrated via a bash script that handles environment variable configuration and module execution.
 
-![LW Reconstruction](Figure/QR_w_Relation/lw_reconstruct_overlay.png)
+```bash
+# Run the pipeline using the concatenated variance procedure
+./Code/run_analysis.sh --mode concat
 
-### Radiative Mode Prediction Contrast
-Using idealized vertical modes, we visualize the contrast between the original (derived via basis decomposition) and reconstructed (derived via the Jacobian matrices) profiles of the radiative heating rates. This highlights how well the model predicts the radiative responses to pure vertical dynamic modes.
+# Run the pipeline using the smoothed composite procedure
+./Code/run_analysis.sh --mode composite
+```
 
-![Radiative Mode Prediction](Figure/Rad_mode_predict.png)
+## 6. Verification Metrics
 
-### Mode Verification Scatter
-Scatter plot comparing the mode-reconstructed radiative heating profiles against the original CloudSat validating datasets, ensuring accuracy when filtered through the theoretical vertical modes.
+System performance is evaluated using the validation dataset against ground-truth CloudSat observations.
 
-![Mode Verification Scatter](Figure/Rad_mode_verification/scatter_verify.png)
+*   **Vertical Correlation Profile:** Assesses the Pearson Correlation Coefficient ($R$) as a function of pressure altitude.
+    <br>![Correlation Profile](Figure/QR_w_Relation/corr_profile.png)
 
-### Mode Verification Cross-section
-Overlay of the validating data (contours) on top of the mode-reconstructed data (color shading) over the last 320 samples, demonstrating structural consistency.
+*   **Global Scatter Verification:** Aggregate scatter plot of reconstructed versus true validation data.
+    <br>![Scatter Verification](Figure/QR_w_Relation/verify.png)
 
-**Longwave Heating Verification:**
-![LW Mode Verification](Figure/Rad_mode_verification/lw_reconstruct_overlay.png)
+*   **Spatial Cross-Section:** Validation truth (contours) overlaid on the model reconstruction (color mesh).
+    <br>![LW Reconstruction](Figure/QR_w_Relation/lw_reconstruct_overlay.png)
 
-**Shortwave Heating Verification:**
-![SW Mode Verification](Figure/Rad_mode_verification/sw_reconstruct_overlay.png)
+*   **Radiative Mode Prediction:** Contrast between empirical basis decomposition and the Jacobian matrix predictions on idealized vertical modes.
+    <br>![Radiative Mode Prediction](Figure/Rad_mode_predict.png)
 
-## 4. Quick Tour of Composite Structures
+## 7. System Outputs (Composite Wave Structure)
 
-To better understand the composited wave structure (e.g., for Wavenumber 1~13):
+Sample outputs generated by the pipeline illustrating the core Kelvin Wave composite structure:
 
-*   **KW OLR Composite:**
-    
-    ![OLR Composite](Figure/KW_olr/k=1~13/composite.png)
+*   **OLR Composite Anomaly:**
+    <br>![OLR Composite](Figure/KW_olr/k=1~13/composite.png)
 *   **Vertical Motion ($w$) Anomaly:**
-    
-    ![w Composite](Figure/w_composite/k=1~13.png)
-*   **Longwave and Shortwave Heating Anomalies:**
-    
-    ![QR Composite](Figure/QR_composite/k=1~13.png)
-
-## Appendix: Linear Regression Workflow (`QR_w_Relation.py`)
-
-The script computes the linear mapping between vertical motion ($w$) and radiative heating ($Q_{LW}$, $Q_{SW}$) via the following procedure:
-
-1. **Data Prep:** Loads, slices, and concatenates $w$, $Q_{LW}$, and $Q_{SW}$ arrays, splitting them into Training and Validation sets.
-2. **PLS Regression:** Trains Partial Least Squares (PLS) models (5 components) on the training set to map $w$ to heating rates.
-3. **Jacobian Extraction:** Extracts model coefficients as Jacobian matrices ($M_{LW}$, $M_{SW}$) that represent the linear transfer function ($Q' \approx M w'$).
-4. **Validation:** Reconstructs heating anomalies on the validation set, generating visual evaluations (heatmaps, correlation profiles, scatter plots, and cross-section overlays).
-5. **Output:** Saves the Jacobian matrices as numpy binaries for downstream mode predictions.
+    <br>![w Composite](Figure/w_composite/k=1~13.png)
+*   **Radiative Heating ($Q$) Anomalies:**
+    <br>![QR Composite](Figure/QR_composite/k=1~13.png)
