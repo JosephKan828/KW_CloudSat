@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 # Parse Command Line Arguments (The Switcher)
 # ====================================================
 # Default mode is concat
-DATA_TYPE="concat"
+DATA_TYPE="composite"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
