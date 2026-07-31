@@ -136,7 +136,7 @@ def main(data_type: str) -> None:
     p_era5: np.ndarray = np.linspace(1000.0, 100.0, 37)
 
     # Interpolate vertical motion to z coordinate
-    w_z: np.ndarray = interp1d(p_era5, w_concat, axis=1, fill_value="extrapolate")(p/100.0).T*86400.0
+    w_z: np.ndarray = interp1d(p_era5, w_concat, axis=1, fill_value="extrapolate")(p/100.0).T*86400.0 # type: ignore
 
     # Projection
     w_coeff: np.ndarray = np.linalg.solve(Gstack.T@Gstack, Gstack.T @ (rho[:, None]*w_z))
@@ -166,8 +166,8 @@ def main(data_type: str) -> None:
     # Interpolate to ERA5 space
     # ------------------------------------------------
 
-    lw_era5: np.ndarray = interp1d(p/100.0, lw_z, axis=1, fill_value="extrapolate")(p_era5)
-    sw_era5: np.ndarray = interp1d(p/100.0, sw_z, axis=1, fill_value="extrapolate")(p_era5)
+    lw_era5: np.ndarray = interp1d(p/100.0, lw_z, axis=1, fill_value="extrapolate")(p_era5) # type: ignore
+    sw_era5: np.ndarray = interp1d(p/100.0, sw_z, axis=1, fill_value="extrapolate")(p_era5) # type: ignore
 
     print("Reconstructed shape:", lw_era5.shape)
 

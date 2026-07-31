@@ -110,8 +110,6 @@ def main(data_type: str) -> None:
 
     # basis for J and T
     J_G_mat: np.ndarray = G_mat * (9.81/1004.5 - 0.0065)
-    
-    print(J_G_mat.shape)
 
     lw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*lw_w1)[:, None])
     sw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*sw_w1)[:, None])
