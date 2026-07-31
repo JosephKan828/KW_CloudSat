@@ -25,76 +25,54 @@ from typing import List, Dict
 
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
+import utils
 
-plt.style.use("~/KW_CloudSat/scientific.mplstyle")
-
-# ====================================================
-# Helper function
-# ====================================================
-
-def _EOF(data):
-
-    # acquire the shape information
-    nsample, nz = data.shape
-
-    # 1. Center the data (calculate anomalies)
-    data_mean = np.mean(data, axis=0)
-    data_anom = data - data_mean
-
-    # 2. Covariance matrix for data array
-    cov: np.ndarray = (data_anom.T @ data_anom) / (nsample - 1)
-
-    # 3. Eigenvalue and eigenvector
-    # Use eigh for symmetric matrices (guarantees real numbers and better stability)
-    eigvals, eigvecs = np.linalg.eigh(cov)
-
-    ## sort eigenvector with the magnitude of eigenvalue (eigh sorts ascending, so reverse)
-    eigvals_sort_idx: np.ndarray = np.argsort(eigvals)[::-1]
-
-    exp_var: np.ndarray = eigvals[eigvals_sort_idx] / np.sum(eigvals)
-
-    ## sort eigenvector
-    eigvec_sorted: np.ndarray = eigvecs[:, eigvals_sort_idx]
-
-    # construct EOF and PCs
-    EOF: np.ndarray = eigvec_sorted
-    
-    # 4. Orthogonal projection (EOF @ EOF.T is Identity)
-    PCs: np.ndarray = EOF.T @ data_anom.T
-
-    return exp_var, EOF, PCs, data_mean
+utils.set_matplotlib_style()
 
 # ====================================================
 # Main function
 # ====================================================
 
-def main() -> None:
+def main(data_type: str) -> None:
     
     # ------------------------------------------------
     # Load data
     # ------------------------------------------------
-    input_dir: Path = Path.cwd().parent / "Files"
+    root_dir: Path = Path("/home/b11209013/KW_CloudSat/")
+    input_dir: Path =  root_dir / "Files/"
 
     # Load vertical motion as dictionary
-    fname_w: List[str] = list(glob(str(input_dir / "w_composite/*.npy")))
+    match data_type:
+        case "concat":
+            fname_w: List[str] = list(glob(str(input_dir / "w_concate/*.npy")))
+        case "composite":
+            fname_w: List[str] = list(glob(str(input_dir / "w_composite/*.npy")))
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     w: Dict[str, np.ndarray] = {
             fname.split("/")[-1].split(".")[0]: np.load(fname)[...]
             for fname in fname_w
-            }
+            }  
 
-    nz, nx = w["k=1~3"].shape
+    match data_type:
+        case "concat":
+            _, nz, nx = w["k=1~3"].shape
+        case "composite":
+            nz, nx = w["k=1~3"].shape
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # Load radiative heating rate
     fname_qr: List[str] = list(glob(str(input_dir / "QR_composite/k*")))
 
     lw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/concat/LW.npy")[...]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/LW.npy")[...]
             for fname in fname_qr
             }
 
     sw: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/concat/SW.npy")[...]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/SW.npy")[...]
             for fname in fname_qr
             }
 
@@ -103,29 +81,52 @@ def main() -> None:
     # ------------------------------------------------
 
     keys = sorted(w.keys())
-    w_concat: np.ndarray = np.concatenate([
-        w[k].T for k in keys
-        ])
+    
+    # if the data type is `concat`, first transform the
+    # data shape into nz nsample
 
-    lw_concat: np.ndarray = np.concatenate([
-        lw[k].T for k in keys
-        ])
+    match data_type:
+        case "concat":
+            w_concat: np.ndarray = np.concatenate([w[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            lw_concat: np.ndarray = np.concatenate([lw[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            sw_concat: np.ndarray = np.concatenate([sw[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
 
-    sw_concat: np.ndarray = np.concatenate([
-        sw[k].T for k in keys
-        ])
+            lw_non_nan : np.ndarray = np.all(~np.isnan(lw_concat), axis=1)
+            sw_non_nan : np.ndarray = np.all(~np.isnan(sw_concat), axis=1)
+            non_nan_idx: np.ndarray = lw_non_nan & sw_non_nan
 
-    pprint(w_concat.shape)
-    pprint(lw_concat.shape)
-    pprint(sw_concat.shape)
+            # Calculate standard derivation in LW and SW heating
+            lw_std: float = float(np.nanstd(lw_concat[non_nan_idx, :]))
+            sw_std: float = float(np.nanstd(sw_concat[non_nan_idx, :]))
+
+            lw_norm_idx: np.ndarray = np.all(np.abs(lw_concat[non_nan_idx, :]) < 3 * lw_std, axis=1)
+            sw_norm_idx: np.ndarray = np.all(np.abs(sw_concat[non_nan_idx, :]) < 3 * sw_std, axis=1) 
+            norm_idx: np.ndarray = lw_norm_idx & sw_norm_idx
+            
+            w_concat = w_concat[non_nan_idx, :][norm_idx, :]
+            lw_concat = lw_concat[non_nan_idx, :][norm_idx, :]
+            sw_concat = sw_concat[non_nan_idx, :][norm_idx, :]
+
+            print(w_concat.shape)
+
+        case "composite":
+            w_concat: np.ndarray = np.concatenate([w[k].T for k in keys])
+            lw_concat: np.ndarray = np.concatenate([lw[k].T for k in keys])
+            sw_concat: np.ndarray = np.concatenate([sw[k].T for k in keys])
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # ------------------------------------------------
     # Split data into training and verifying
     # ------------------------------------------------
 
-    w_train : np.ndarray = w_concat[:nx*6] ; w_valid : np.ndarray = w_concat[nx*6:]
-    lw_train: np.ndarray = lw_concat[:nx*6]; lw_valid: np.ndarray = lw_concat[nx*6:]
-    sw_train: np.ndarray = sw_concat[:nx*6]; sw_valid: np.ndarray = sw_concat[nx*6:]
+    # training size: first 5/6 of total samples, verifying size: last 1/6 of total samples
+    n_sample_train: int = w_concat.shape[0] * 5 // 6
+    n_sample_valid: int = w_concat.shape[0] - n_sample_train
+
+    w_train : np.ndarray = w_concat[:n_sample_train] ; w_valid : np.ndarray = w_concat[n_sample_train:n_sample_train + n_sample_valid]
+    lw_train: np.ndarray = lw_concat[:n_sample_train]; lw_valid: np.ndarray = lw_concat[n_sample_train:n_sample_train + n_sample_valid]
+    sw_train: np.ndarray = sw_concat[:n_sample_train]; sw_valid: np.ndarray = sw_concat[n_sample_train:n_sample_train + n_sample_valid]
 
     # ------------------------------------------------
     # Use Partial Least Squares (PLS) regression
@@ -135,8 +136,10 @@ def main() -> None:
     
     # Fit PLS models for LW and SW (using 4 components)
     # scale=False means it will center the data but not normalize by standard deviation
-    pls_lw = PLSRegression(n_components=4, scale=False)
-    pls_sw = PLSRegression(n_components=4, scale=False)
+    n_components: int = 4
+    
+    pls_lw = PLSRegression(n_components=n_components, scale=False)
+    pls_sw = PLSRegression(n_components=n_components, scale=False)
     
     pls_lw.fit(w_train, lw_train)
     pls_sw.fit(w_train, sw_train)
@@ -144,8 +147,8 @@ def main() -> None:
     # Extract Jacobian Matrices (equivalent to the M_lw and M_sw matrices)
     # PLS prediction is internally: Y_pred = (X - X_mean) @ coef_ + Y_mean
     # Since we want M_lw such that M_lw @ w.T matches this, we transpose coef_
-    M_lw: np.ndarray = pls_lw.coef_
-    M_sw: np.ndarray = pls_sw.coef_
+    M_lw: np.ndarray = pls_lw.coef_.T
+    M_sw: np.ndarray = pls_sw.coef_.T
 
     # ------------------------------------------------
     # Verifying
@@ -168,7 +171,6 @@ def main() -> None:
     lw_recon: np.ndarray = lw_recon_anom + lw_valid_mean[:, np.newaxis]
     sw_recon: np.ndarray = sw_recon_anom + sw_valid_mean[:, np.newaxis]
 
-    
     # ------------------------------------------------
     # Visualize the matrix
     # ------------------------------------------------
@@ -177,7 +179,7 @@ def main() -> None:
     lev: np.ndarray = np.linspace(1000.0, 100.0, 37)
 
     # Setup figure path
-    fig_path: Path = Path.cwd().parent / "Figure" / "QR_w_Relation"
+    fig_path: Path = root_dir / "Figure" / "QR_w_Relation" / data_type
     os.makedirs(fig_path, exist_ok=True)
 
     # M_lw
@@ -249,27 +251,53 @@ def main() -> None:
     plt.close(fig)
 
     # ------------------------------------------------
+    # Statistical Verification of Correlation Profile
+    # ------------------------------------------------
+
+    def vectorized_col_corr(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        """Computes column-wise Pearson correlation between two 2D arrays."""
+        # Center data
+        A_centered = A - A.mean(axis=0, keepdims=True)
+        B_centered = B - B.mean(axis=0, keepdims=True)
+        
+        # Sum of squares of anomalies using einsum for efficiency
+        ssA = np.einsum('ij,ij->j', A_centered, A_centered)
+        ssB = np.einsum('ij,ij->j', B_centered, B_centered)
+        
+        # Numerator for correlation
+        corr_num = np.einsum('ij,ij->j', A_centered, B_centered)
+        
+        # Denominator
+        corr_den = np.sqrt(ssA * ssB)
+        
+        # Handle division by zero
+        corr = np.divide(corr_num, corr_den, out=np.zeros_like(corr_num), where=(corr_den!=0))
+        return corr
+
+    corr_lw_profile = vectorized_col_corr(lw_valid, lw_recon.T)
+    corr_sw_profile = vectorized_col_corr(sw_valid, sw_recon.T)
+
+    # Create a pandas DataFrame for easy statistics and saving
+    stats_df = pd.DataFrame({
+        'pressure_hpa': lev,
+        'corr_lw': corr_lw_profile,
+        'corr_sw': corr_sw_profile
+    })
+
+    # Print summary statistics and save to file
+    pprint("\n--- Correlation Profile Statistics ---")
+    pprint("LW Correlation Summary:")
+    pprint(stats_df['corr_lw'].describe())
+    pprint("\nSW Correlation Summary:")
+    pprint(stats_df['corr_sw'].describe())
+    
+    # ------------------------------------------------
     # Visualize the Correlation Score Profile
     # ------------------------------------------------
     
-    nz = lw_valid.shape[1]
-    corr_lw_profile = []
-    corr_sw_profile = []
-    
-    for i in range(nz):
-        if np.std(lw_valid[:, i]) > 0 and np.std(lw_recon.T[:, i]) > 0:
-            corr_lw_profile.append(np.corrcoef(lw_valid[:, i], lw_recon.T[:, i])[0, 1])
-        else:
-            corr_lw_profile.append(0.0)
-            
-        if np.std(sw_valid[:, i]) > 0 and np.std(sw_recon.T[:, i]) > 0:
-            corr_sw_profile.append(np.corrcoef(sw_valid[:, i], sw_recon.T[:, i])[0, 1])
-        else:
-            corr_sw_profile.append(0.0)
-
     fig, ax = plt.subplots(1, 2, figsize=(10, 6), sharey=True)
 
-    # Use a line plot instead of barh for vertical atmospheric profiles
+    # Use a line plot for vertical atmospheric profiles
     ax[0].plot(corr_lw_profile, lev, marker='o', markersize=5, color='coral', linewidth=2, zorder=3)
     ax[1].plot(corr_sw_profile, lev, marker='o', markersize=5, color='skyblue', linewidth=2, zorder=3)
 
@@ -288,102 +316,20 @@ def main() -> None:
     plt.tight_layout()
     plt.savefig(fig_path / "corr_profile.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
-
-    # ------------------------------------------------
-    # Visualize the last 676 samples (Reconstruction vs Validation)
-    # ------------------------------------------------
+    pprint(f"Correlation profile plot saved to {fig_path / 'corr_profile.png'}")
     
-    # Extract the last 676 samples
-    lw_recon_last = lw_recon
-    lw_valid_last = lw_valid.T
-    
-    samples = np.arange(nx)
-    
-    fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
-    
-    # Panel 1: 2D Cross section
-    pcm = ax[0].pcolormesh(samples, lev, lw_recon_last, cmap="RdBu_r", norm=TwoSlopeNorm(vcenter=0.0), shading='nearest')
-    
-    # Add negative contours (dashed) and positive contours (solid)
-    levels = np.linspace(np.min(lw_valid_last), np.max(lw_valid_last), 9)
-    linestyles = ['--' if v < 0 else '-' for v in levels]
-    cs = ax[0].contour(samples, lev, lw_valid_last, levels=levels, colors='black', linewidths=1.0, alpha=0.8, linestyles=linestyles)
-    ax[0].clabel(cs, inline=True, fontsize=9, fmt='%.1f')
-    
-    ax[0].invert_yaxis()
-    ax[0].set_ylabel("Pressure (hPa)")
-    ax[0].set_xlabel("Sample Index (last 676)")
-    ax[0].set_title("LW Heating Rate: Recon (Color) vs Valid (Contours)")
-    
-    cbar = fig.colorbar(pcm, ax=ax[0], label="LW Heating Rate (K/day)", pad=0.02)
-    
-    # Panel 2: Mean Vertical Profile (1D)
-    lw_recon_mean = np.mean(lw_recon_last, axis=1)
-    lw_valid_mean_1d = np.mean(lw_valid_last, axis=1)
-    
-    ax[1].plot(lw_valid_mean_1d, lev, color='black', label='Validation', linewidth=2.5, zorder=3)
-    ax[1].plot(lw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2.5, zorder=4)
-    
-    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1.5, zorder=2)
-    ax[1].set_xlabel("Mean LW Heating (K/day)")
-    ax[1].set_title("Mean Vertical Profile")
-    ax[1].legend()
-    ax[1].grid(True, linestyle=':', alpha=0.6)
-    
-    plt.tight_layout()
-    plt.savefig(fig_path / "lw_reconstruct_overlay.png", dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
-    # ------------------------------------------------
-    # Visualize the last 676 samples for SW (Reconstruction vs Validation)
-    # ------------------------------------------------
-    
-    # Extract the last 676 samples for SW
-    sw_recon_last = sw_recon[:, -676:]
-    sw_valid_last = sw_valid[-676:, :].T
-    
-    fig, ax = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
-    
-    # Panel 1: 2D Cross section
-    pcm_sw = ax[0].pcolormesh(samples, lev, sw_recon_last, cmap="RdBu_r", norm=TwoSlopeNorm(vcenter=0.0), shading='nearest')
-    
-    if np.ptp(sw_valid_last) > 0:
-        levels_sw = np.linspace(np.min(sw_valid_last), np.max(sw_valid_last), 9)
-        linestyles_sw = ['--' if v < 0 else '-' for v in levels_sw]
-        cs_sw = ax[0].contour(samples, lev, sw_valid_last, levels=levels_sw, colors='black', linewidths=1.0, alpha=0.8, linestyles=linestyles_sw)
-        ax[0].clabel(cs_sw, inline=True, fontsize=9, fmt='%.1f')
-    
-    ax[0].invert_yaxis()
-    ax[0].set_ylabel("Pressure (hPa)")
-    ax[0].set_xlabel("Sample Index (last 676)")
-    ax[0].set_title("SW Heating Rate: Recon (Color) vs Valid (Contours)")
-    
-    cbar_sw = fig.colorbar(pcm_sw, ax=ax[0], label="SW Heating Rate (K/day)", pad=0.02)
-    
-    # Panel 2: Mean Vertical Profile (1D)
-    sw_recon_mean = np.mean(sw_recon_last, axis=1)
-    sw_valid_mean_1d = np.mean(sw_valid_last, axis=1)
-    
-    ax[1].plot(sw_valid_mean_1d, lev, color='black', label='Validation', linewidth=2.5, zorder=3)
-    ax[1].plot(sw_recon_mean, lev, color='red', linestyle='--', label='Reconstruction', linewidth=2.5, zorder=4)
-    
-    ax[1].axvline(0, color='gray', linestyle='--', linewidth=1.5, zorder=2)
-    ax[1].set_xlabel("Mean SW Heating (K/day)")
-    ax[1].set_title("Mean Vertical Profile")
-    ax[1].legend()
-    ax[1].grid(True, linestyle=':', alpha=0.6)
-    
-    plt.tight_layout()
-    plt.savefig(fig_path / "sw_reconstruct_overlay.png", dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
     # ------------------------------------------------
     # Save file
     # ------------------------------------------------
 
     # save file
-    save_path: Path = Path("/home/b11209013/KW_CloudSat/Files/Linear_Relation/")
+    folder_name = "Linear_Relation"
+    save_path: Path = root_dir / "Files" / folder_name / data_type
     os.makedirs(save_path, exist_ok=True)
+
+    stats_path = save_path / "correlation_profile_stats.csv"
+    stats_df.to_csv(stats_path, index=False, float_format='%.4f')
+    pprint(f"\nCorrelation statistics saved to {stats_path}\n")
 
     np.save(save_path / "M_lw.npy", M_lw)
     np.save(save_path / "M_sw.npy", M_sw)
@@ -392,5 +338,10 @@ def main() -> None:
 # Execute main function
 # ====================================================
 
+import argparse
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_type", type=str, required=True, choices=["concat", "composite"])
+    args = parser.parse_args()
+    main(args.data_type)

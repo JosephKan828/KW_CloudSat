@@ -9,17 +9,6 @@
 import os
 import sys
 
-# Define target CPU/thread limit
-MAX_CPUS = 4
-
-# Set thread limit for major libraries
-cpu_limit_str = str(MAX_CPUS)
-os.environ["OMP_NUM_THREADS"] = cpu_limit_str
-os.environ["MKL_NUM_THREADS"] = cpu_limit_str
-os.environ["OPENBLAS_NUM_THREADS"] = cpu_limit_str
-os.environ["VECLIB_MAXIMUM_THREADS"] = cpu_limit_str
-os.environ["NUMEXPR_NUM_THREADS"] = cpu_limit_str
-
 # Import packages
 import numpy as np
 import pandas as pd
@@ -29,8 +18,9 @@ from scipy.ndimage import minimum_filter
 from pathlib import Path
 from pprint import pprint
 from matplotlib import pyplot as plt
+import utils
 
-plt.style.use("~/KW_CloudSat/scientific.mplstyle")
+utils.set_matplotlib_style()
 
 sys.path.append("/home/b11209013/demo_code/")
 import PowerSpec as ps                # pyright: ignore[reportMissingImports]
@@ -252,7 +242,6 @@ def main(k_min: int, k_max: int) -> None:
 # Execute main function
 # ====================================================
 if __name__ == "__main__":
-
     k_mins: list[int] = [1, 1, 3, 5, 7, 9, 11]
     k_maxs: list[int] = [13, 3, 5, 7, 9, 11, 13]
 

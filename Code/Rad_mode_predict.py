@@ -15,17 +15,6 @@ import sys
 
 from numpy.ma.core import shrink_mask
 
-# Define target CPU/thread limit
-MAX_CPUS = 4
-
-# Set thread limit for major libraries
-cpu_limit_str = str(MAX_CPUS)
-os.environ["OMP_NUM_THREADS"] = cpu_limit_str
-os.environ["MKL_NUM_THREADS"] = cpu_limit_str
-os.environ["OPENBLAS_NUM_THREADS"] = cpu_limit_str
-os.environ["VECLIB_MAXIMUM_THREADS"] = cpu_limit_str
-os.environ["NUMEXPR_NUM_THREADS"] = cpu_limit_str
-
 # Import package
 import sys
 import numpy as np
@@ -40,21 +29,28 @@ from scipy.interpolate import interp1d
 
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
+import utils
 
-plt.style.use("~/KW_CloudSat/scientific.mplstyle")
+utils.set_matplotlib_style()
 
 # ====================================================
 # Main function
 # ====================================================
 
-def main() -> None:
+def main(data_type: str) -> None:
 
     # ------------------------------------------------
     # Load Jacobian Matrix
     # ------------------------------------------------
 
-    root_dir : Path = Path("/home/b11209013/KW_CloudSat/")
-    input_dir: Path = root_dir / "Files" / "Linear_Relation"
+    root_dir: Path = Path("/home/b11209013/KW_CloudSat/")
+
+    match data_type:
+        case "concat" | "composite":
+            input_dir = root_dir / "Files" / "Linear_Relation" / data_type
+            fig_name = f"Rad_mode_predict_{data_type}.png"
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     M_lw: np.ndarray = np.load(input_dir / "M_lw.npy")
     M_sw: np.ndarray = np.load(input_dir / "M_sw.npy")
@@ -63,20 +59,14 @@ def main() -> None:
     # Construct backgroun information
     # ------------------------------------------------
 
-    z  : np.ndarray = np.linspace(0.0, 14000.0, 71)                   # vertical coordinate
-
-    T  : np.ndarray = 300.0 - 0.0065 * z                              # background temperature profile
-    p  : np.ndarray = 1e5 * (1-0.0065*z/300.0) ** (9.81/0.0065/287.5) # pressure profile based on hydrstat
-
-    rho: np.ndarray = p / T / 287.5
+    z, T, p, rho = utils.get_background_profiles()
 
     # ------------------------------------------------
     # Calculate vertical motion profile
     # ------------------------------------------------
 
     # vertical basis
-    G1: np.ndarray = np.pi / 2 * np.sin(np.pi*z/z.max())
-    G2: np.ndarray = np.pi / 2 * np.sin(2*np.pi*z/z.max())
+    G1, G2 = utils.get_vertical_basis(z)
 
     G_mat: np.ndarray = np.vstack([G1, G2]).T
 
@@ -120,8 +110,6 @@ def main() -> None:
 
     # basis for J and T
     J_G_mat: np.ndarray = G_mat * (9.81/1004.5 - 0.0065)
-    
-    print(J_G_mat.shape)
 
     lw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*lw_w1)[:, None])
     sw_w1_coeff: np.ndarray = np.linalg.solve(J_G_mat.T @ J_G_mat, J_G_mat.T @ (rho*sw_w1)[:, None])
@@ -177,7 +165,7 @@ def main() -> None:
 
     plt.tight_layout()
     
-    save_path = root_dir / "Figure" / "Rad_mode_predict.png"
+    save_path = root_dir / "Figure" / fig_name
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"Visualization saved to {save_path}")
@@ -187,7 +175,7 @@ def main() -> None:
     # ------------------------------------------------
 
     # file path
-    output_path: Path = root_dir / "Files" / "Linear_Relation"
+    output_path = input_dir
 
     output_arr: np.ndarray = np.array([lw_w1_coeff, lw_w2_coeff, sw_w1_coeff, sw_w2_coeff])
 
@@ -200,5 +188,10 @@ def main() -> None:
 # Execute main function
 # ====================================================
 
+import argparse
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_type", type=str, required=True, choices=["concat", "composite"])
+    args = parser.parse_args()
+    main(args.data_type)

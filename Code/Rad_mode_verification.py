@@ -15,17 +15,6 @@ import sys
 
 from numpy.ma.core import shrink_mask
 
-# Define target CPU/thread limit
-MAX_CPUS = 4
-
-# Set thread limit for major libraries
-cpu_limit_str = str(MAX_CPUS)
-os.environ["OMP_NUM_THREADS"] = cpu_limit_str
-os.environ["MKL_NUM_THREADS"] = cpu_limit_str
-os.environ["OPENBLAS_NUM_THREADS"] = cpu_limit_str
-os.environ["VECLIB_MAXIMUM_THREADS"] = cpu_limit_str
-os.environ["NUMEXPR_NUM_THREADS"] = cpu_limit_str
-
 # Import package
 import sys
 import numpy as np
@@ -40,14 +29,15 @@ from scipy.interpolate import interp1d
 
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
+import utils
 
-plt.style.use("~/KW_CloudSat/scientific.mplstyle")
+utils.set_matplotlib_style()
 
 # ====================================================
 # Main function
 # ====================================================
 
-def main() -> None:
+def main(data_type: str) -> None:
 
     # ------------------------------------------------
     # Load composite vertical motion
@@ -58,30 +48,40 @@ def main() -> None:
     file_dir: Path = root_dir / "Files"
 
     # Load vertical motion as dictionary
-    fname_w: List[str] = list(glob(str(file_dir / "w_composite/*.npy")))
-
-    dx: float = 360.0 / 576.0 
+    match data_type:
+        case "concat":
+            fname_w: List[str] = list(glob(str(file_dir / "w_concate/*.npy")))
+        case "composite":
+            fname_w: List[str] = list(glob(str(file_dir / "w_composite/*.npy")))
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     w: Dict[str, np.ndarray] = {
-            fname.split("/")[-1].split(".")[0]: np.load(fname)[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1].split(".")[0]: np.load(fname)[...]
             for fname in fname_w
             }
 
-    nz, nx = w["k=1~3"].shape
+    match data_type:
+        case "concat":
+            _, nz, nx = w["k=1~3"].shape
+        case "composite":
+            nz, nx = w["k=1~3"].shape
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # Load regression coefficient
-    reg_coeff: np.ndarray = np.load(file_dir / "Linear_Relation" / "regress_coeff.npy").squeeze()
+    reg_coeff: np.ndarray = np.load(file_dir / "Linear_Relation" / data_type / "regress_coeff.npy").squeeze()
     
     # Load radiative heating profile
     fname_qr: List[str] = list(glob(str(file_dir / "QR_composite/k*")))
 
     lw_valid: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/LW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/LW.npy")[...]
             for fname in fname_qr
             }
 
     sw_valid: Dict[str, np.ndarray] = {
-            fname.split("/")[-1]: np.load(fname+"/SW.npy")[:, int(288-100/dx):int(288+100/dx)]
+            fname.split("/")[-1]: np.load(fname+f"/{data_type}/SW.npy")[...]
             for fname in fname_qr
             }
 
@@ -90,20 +90,14 @@ def main() -> None:
     # Construct backgroun information
     # ------------------------------------------------
 
-    z  : np.ndarray = np.linspace(0.0, 14000.0, 71)                   # vertical coordinate
-
-    T  : np.ndarray = 300.0 - 0.0065 * z                              # background temperature profile
-    p  : np.ndarray = 1e5 * (1-0.0065*z/300.0) ** (9.81/0.0065/287.5) # pressure profile based on hydrstat
-
-    rho: np.ndarray = p / T / 287.5
+    z, T, p, rho = utils.get_background_profiles()
 
     # ------------------------------------------------
     # Calculate vertical motion profile
     # ------------------------------------------------
 
     # vertical basis
-    G1: np.ndarray = np.pi / 2 * np.sin(np.pi*z/z.max())
-    G2: np.ndarray = np.pi / 2 * np.sin(2*np.pi*z/z.max())
+    G1, G2 = utils.get_vertical_basis(z)
 
     Gstack: np.ndarray = np.stack([G1, G2]).T
 
@@ -112,17 +106,27 @@ def main() -> None:
     # ------------------------------------------------
 
     keys = sorted(w.keys())
-    w_concat: np.ndarray = np.concatenate([
-        w[k].T for k in keys
-        ])
+    
+    match data_type:
+        case "concat":
+            w_concat: np.ndarray = np.concatenate([w[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            lw_concat: np.ndarray = np.concatenate([lw_valid[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
+            sw_concat: np.ndarray = np.concatenate([sw_valid[k].transpose(0, 2, 1).reshape(-1, nz) for k in keys], axis=0)
 
-    lw_concat: np.ndarray = np.concatenate([
-        lw_valid[k].T for k in keys
-        ])
+            lw_non_nan : np.ndarray = np.all(~np.isnan(lw_concat), axis=1)
+            sw_non_nan : np.ndarray = np.all(~np.isnan(sw_concat), axis=1)
+            non_nan_idx: np.ndarray = lw_non_nan & sw_non_nan
 
-    sw_concat: np.ndarray = np.concatenate([
-        sw_valid[k].T for k in keys
-        ])
+            w_concat = w_concat[non_nan_idx]
+            lw_concat = lw_concat[non_nan_idx]
+            sw_concat = sw_concat[non_nan_idx]
+
+        case "composite":
+            w_concat: np.ndarray = np.concatenate([w[k].T for k in keys])
+            lw_concat: np.ndarray = np.concatenate([lw_valid[k].T for k in keys])
+            sw_concat: np.ndarray = np.concatenate([sw_valid[k].T for k in keys])
+        case _:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'concat' or 'composite'.")
 
     # ------------------------------------------------
     # Project data onto basis
@@ -132,7 +136,7 @@ def main() -> None:
     p_era5: np.ndarray = np.linspace(1000.0, 100.0, 37)
 
     # Interpolate vertical motion to z coordinate
-    w_z: np.ndarray = interp1d(p_era5, w_concat, axis=1, fill_value="extrapolate")(p/100.0).T*86400.0
+    w_z: np.ndarray = interp1d(p_era5, w_concat, axis=1, fill_value="extrapolate")(p/100.0).T*86400.0 # type: ignore
 
     # Projection
     w_coeff: np.ndarray = np.linalg.solve(Gstack.T@Gstack, Gstack.T @ (rho[:, None]*w_z))
@@ -150,10 +154,10 @@ def main() -> None:
     # reconstruct to vertical profile
     # ------------------------------------------------
 
-    lw1_z: np.ndarray = np.einsum("s,z->sz", lw1, G1) * (9.8/1004.5 - 0.0065)
-    lw2_z: np.ndarray = np.einsum("s,z->sz", lw2, G2) * (9.8/1004.5 - 0.0065)
-    sw1_z: np.ndarray = np.einsum("s,z->sz", sw1, G1) * (9.8/1004.5 - 0.0065)
-    sw2_z: np.ndarray = np.einsum("s,z->sz", sw2, G2) * (9.8/1004.5 - 0.0065)
+    lw1_z: np.ndarray = np.einsum("s,z->sz", lw1, G1) * (9.81/1004.5 - 0.0065)
+    lw2_z: np.ndarray = np.einsum("s,z->sz", lw2, G2) * (9.81/1004.5 - 0.0065)
+    sw1_z: np.ndarray = np.einsum("s,z->sz", sw1, G1) * (9.81/1004.5 - 0.0065)
+    sw2_z: np.ndarray = np.einsum("s,z->sz", sw2, G2) * (9.81/1004.5 - 0.0065)
 
     lw_z: np.ndarray = (lw1_z + lw2_z) / rho[None, :]
     sw_z: np.ndarray = (sw1_z + sw2_z) / rho[None, :]
@@ -162,8 +166,8 @@ def main() -> None:
     # Interpolate to ERA5 space
     # ------------------------------------------------
 
-    lw_era5: np.ndarray = interp1d(p/100.0, lw_z, axis=1, fill_value="extrapolate")(p_era5)
-    sw_era5: np.ndarray = interp1d(p/100.0, sw_z, axis=1, fill_value="extrapolate")(p_era5)
+    lw_era5: np.ndarray = interp1d(p/100.0, lw_z, axis=1, fill_value="extrapolate")(p_era5) # type: ignore
+    sw_era5: np.ndarray = interp1d(p/100.0, sw_z, axis=1, fill_value="extrapolate")(p_era5) # type: ignore
 
     print("Reconstructed shape:", lw_era5.shape)
 
@@ -201,7 +205,7 @@ def main() -> None:
         axes[i].grid(True, linestyle=':', alpha=0.6)
 
     plt.tight_layout()
-    fig_path = root_dir / "Figure" / "Rad_mode_verification"
+    fig_path = root_dir / "Figure" / "Rad_mode_verification" / data_type
     os.makedirs(fig_path, exist_ok=True)
     plt.savefig(fig_path / "scatter_verify.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -292,5 +296,10 @@ def main() -> None:
 # Execute main function
 # ====================================================
 
+import argparse
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_type", type=str, required=True, choices=["concat", "composite"])
+    args = parser.parse_args()
+    main(args.data_type)

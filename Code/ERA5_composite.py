@@ -11,17 +11,6 @@
 import os
 import sys
 
-# Define target CPU/thread limit
-MAX_CPUS = 4
-
-# Set thread limit for major libraries
-cpu_limit_str = str(MAX_CPUS)
-os.environ["OMP_NUM_THREADS"] = cpu_limit_str
-os.environ["MKL_NUM_THREADS"] = cpu_limit_str
-os.environ["OPENBLAS_NUM_THREADS"] = cpu_limit_str
-os.environ["VECLIB_MAXIMUM_THREADS"] = cpu_limit_str
-os.environ["NUMEXPR_NUM_THREADS"] = cpu_limit_str
-
 # Import package
 import numpy as np
 import pandas as pd
@@ -35,8 +24,9 @@ from scipy.ndimage import convolve1d
 
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
+import utils
 
-plt.style.use("~/KW_CloudSat/scientific.mplstyle")
+utils.set_matplotlib_style()
 
 # ====================================================
 # Helper functions
