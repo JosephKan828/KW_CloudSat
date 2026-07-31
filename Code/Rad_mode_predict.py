@@ -82,7 +82,6 @@ def main(data_type: str) -> None:
 
     w1_era5: np.ndarray = interp1d(p/100.0, w1, fill_value="extrapolate")(p_era5)
     w2_era5: np.ndarray = interp1d(p/100.0, w2, fill_value="extrapolate")(p_era5)
-
     # ------------------------------------------------
     # predict radiation through Jacobian Matrix
     # ------------------------------------------------

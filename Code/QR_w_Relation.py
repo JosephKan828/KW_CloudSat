@@ -143,6 +143,8 @@ def main(data_type: str) -> None:
     
     pls_lw.fit(w_train, lw_train)
     pls_sw.fit(w_train, sw_train)
+
+    print(w_train.shape, lw_train.shape, sw_train.shape)
     
     # Extract Jacobian Matrices (equivalent to the M_lw and M_sw matrices)
     # PLS prediction is internally: Y_pred = (X - X_mean) @ coef_ + Y_mean

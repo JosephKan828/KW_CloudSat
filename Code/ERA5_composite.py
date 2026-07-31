@@ -141,10 +141,14 @@ def main(
     # concatenate along event
     w_conc: np.ndarray = np.array([w_roll[i] for i in range(w_roll.shape[0])])
     t_conc: np.ndarray = np.array([t_roll[i] for i in range(t_roll.shape[0])])
-
+    print("w_conc maximum: ", np.nanmax(w_conc))
+    print("t_conc maximum: ", np.nanmax(t_conc))
     # convolve over longitude
     w_comp = convolve1d(w_comp, np.ones(33)/33, axis=-1, mode="reflect")
     t_comp = convolve1d(t_comp, np.ones(33)/33, axis=-1, mode="reflect")
+
+    print("w_comp maximum: ", np.max(w_comp))
+    print("t_comp maximum: ", np.max(t_comp))
 
     pprint("Finished: composite")
 
@@ -164,7 +168,7 @@ def main(
 
     w_cf = ax.contourf(
         lags,
-        coords["lev"],
+        coords["lev"]//100,
         w_comp,
         levels=w_lev,
         cmap="RdBu_r",
@@ -193,7 +197,7 @@ def main(
 
     t_cf = ax.contourf(
         lags,
-        coords["lev"],
+        coords["lev"]//100,
         t_comp,
         levels=t_lev,
         cmap="RdBu_r",
