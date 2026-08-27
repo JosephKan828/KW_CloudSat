@@ -6,6 +6,7 @@ paginate: true
 
 ## Composite Profiles: Vertical Motion (w)
 
+$$
 ---
 
 ## Vertical Motion (w)
