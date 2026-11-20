@@ -1,0 +1,5 @@
+Predictor: Q
+Units: kg kg**-1
+Ridge alpha: 1.0
+Complete profiles: 185105
+Composite prediction uses the Jacobian without the fitted intercept.

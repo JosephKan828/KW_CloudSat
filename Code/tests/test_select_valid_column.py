@@ -65,9 +65,13 @@ class WorkflowTests(unittest.TestCase):
         self.true_sw = np.array([[2, 0, -1], [-1, 1, 0], [0, 2, 1]], dtype=np.float32)
         self.lw = np.einsum("ij,tjyx->tiyx", self.true_lw, self.w) + 20.0
         self.sw = np.einsum("ij,tjyx->tiyx", self.true_sw, self.w) - 5.0
+        self.q = (0.001 * (0.5 * self.w + generator.normal(size=self.w.shape))).astype(np.float32)
         self.w[1, 0, 0, 0] = np.nan
         self.lw[3, 2, 2, 12] = np.nan
         self.sw[6, 1, 1, 28] = np.nan
+        # Q has different missing columns. Its mask must not alter the w fit.
+        self.q[1, 0, 1, 1] = np.nan
+        self.q[3, 1, 0, 14] = np.nan
 
         with nc.Dataset(self.root / "olr.nc", "w") as dataset:
             dataset.createDimension("time", 8)
@@ -79,6 +83,7 @@ class WorkflowTests(unittest.TestCase):
 
         for filename, dimensions, values in (
             ("w.nc", ("time", "plev", "lat", "lon"), {"w": self.w}),
+            ("Q.nc", ("time", "plev", "lat", "lon"), {"Q": self.q}),
             ("heating.nc", ("time", "lev", "latitude", "longitude"),
              {"QLW": self.lw, "QSW": self.sw}),
         ):
@@ -86,7 +91,7 @@ class WorkflowTests(unittest.TestCase):
                 for name, size in zip(dimensions, (8, 3, 3, 32)):
                     dataset.createDimension(name, size)
                 time = dataset.createVariable("time", "f8", ("time",))
-                if filename == "w.nc":
+                if filename in ("w.nc", "Q.nc"):
                     time.units = "day as %Y%m%d.%f"
                     time[:] = 20060101 + np.arange(8) + 0.375
                 else:
@@ -98,6 +103,10 @@ class WorkflowTests(unittest.TestCase):
                 for name, array in values.items():
                     variable = dataset.createVariable(name, "f4", dimensions, fill_value=-9999)
                     variable[:] = np.where(np.isfinite(array), array, -9999)
+                    if name == "Q":
+                        variable.units = "kg kg**-1"
+                    elif name == "w":
+                        variable.units = "m s-1"
 
         np.savetxt(self.root / "events.csv", self.rows, delimiter=",", fmt="%d",
                    header="time_idx,lon_idx", comments="")
@@ -105,6 +114,7 @@ class WorkflowTests(unittest.TestCase):
         for name, values in (
             ("w_composite", w_composite), ("LW_composite", self.true_lw @ w_composite),
             ("SW_composite", self.true_sw @ w_composite), ("plev", self.pressure),
+            ("Q_composite", generator.normal(size=(3, 32)) * 0.001),
         ):
             np.savetxt(self.root / f"{name}.txt", values)
 
@@ -115,8 +125,8 @@ class WorkflowTests(unittest.TestCase):
         exec(compile(setup, str(SCRIPT), "exec"), namespace)
         namespace.update(event_file=self.root / "events.csv", olr_file=self.root / "olr.nc",
                          w_file=self.root / "w.nc", heating_file=self.root / "heating.nc",
-                         composite_dir=self.root, output_dir=self.root / "output",
-                         figure_dir=self.root / "figures",
+                         humidity_file=self.root / "Q.nc", composite_dir=self.root,
+                         output_root=self.root / "output", figure_root=self.root / "figures",
                          event_start=np.datetime64("2006-01-01", "D"),
                          event_end=np.datetime64("2006-01-08", "D"))
         with contextlib.redirect_stdout(io.StringIO()):
@@ -126,29 +136,43 @@ class WorkflowTests(unittest.TestCase):
     def test_end_to_end_matches_notebook_regression_and_writes_all_figures(self):
         result = self.run_analysis()
         centered = []
-        for data in (self.w, self.lw, self.sw):
+        for data in (self.w, self.q, self.lw, self.sw):
             anomaly = data - np.nanmean(data, axis=(0, -1), keepdims=True)
             samples = [np.roll(anomaly[time], 16 - lon * 4, axis=-1)
                        for time, lon in self.rows]
             centered.append(np.asarray(samples).transpose(1, 3, 0, 2))
-        mask = np.all(np.isfinite(centered[0]) & np.isfinite(centered[1])
-                      & np.isfinite(centered[2]), axis=0)
-        for name, heating in zip(("LW", "SW"), centered[1:]):
-            model = Ridge(alpha=1, solver="svd").fit(centered[0][:, mask].T,
-                                                    heating[:, mask].T)
-            actual = np.loadtxt(self.root / "output" / f"Jacob_{name}.txt")
-            np.testing.assert_allclose(actual, model.coef_, atol=2e-5, rtol=2e-5)
+        for predictor_name, predictor in zip(("w", "Q"), centered[:2]):
+            mask = np.all(np.isfinite(predictor) & np.isfinite(centered[2])
+                          & np.isfinite(centered[3]), axis=0)
+            directory = self.root / "output" / predictor_name / "k=1~13"
+            for name, heating in zip(("LW", "SW"), centered[2:]):
+                model = Ridge(alpha=1, solver="svd").fit(predictor[:, mask].T,
+                                                        heating[:, mask].T)
+                actual = np.loadtxt(directory / f"Jacob_{name}.txt")
+                np.testing.assert_allclose(actual, model.coef_, atol=2e-5, rtol=2e-5)
+                composite = np.loadtxt(self.root / f"{predictor_name}_composite.txt")
+                prediction = np.loadtxt(directory / f"{name}_prediction.txt")
+                np.testing.assert_allclose(prediction, actual @ composite)
+            fit_info = (directory / "fit_info.txt").read_text()
+            self.assertIn(f"Complete profiles: {np.count_nonzero(mask)}\n", fit_info)
+            if predictor_name == "Q":
+                self.assertIn("Units: kg kg**-1", fit_info)
         np.testing.assert_array_equal(result["w_time_idx"], self.rows[:, 0])
         np.testing.assert_array_equal(result["w_lon_idx"], self.rows[:, 1] * 4)
-        with (self.root / "output" / "event_grid_mapping.csv").open() as stream:
+        with (self.root / "output" / "w" / "k=1~13" / "event_grid_mapping.csv").open() as stream:
             mappings = list(csv.DictReader(stream))
         self.assertEqual(mappings[1]["olr_lon_idx"], "3")
         self.assertEqual(mappings[1]["era5_lon_idx"], "12")
         self.assertEqual(mappings[1]["date"], "2006-01-04")
-        for stem in ("Longwave", "Shortwave", "LW_SW_prediction_scatter", "Jacobian"):
-            for extension in ("png", "pdf"):
-                self.assertGreater((self.root / "figures" / f"{stem}.{extension}").stat().st_size, 0)
-        self.assertTrue((self.root / "output" / "verification_metrics.csv").exists())
+        for predictor_name in ("w", "Q"):
+            for stem in ("Longwave", "Shortwave", "LW_SW_prediction_scatter", "Jacobian"):
+                for extension in ("png", "pdf"):
+                    image = self.root / "figures" / predictor_name / "k=1~13" / f"{stem}.{extension}"
+                    self.assertGreater(image.stat().st_size, 0)
+            self.assertTrue((self.root / "output" / predictor_name / "k=1~13"
+                             / "verification_metrics.csv").exists())
+        self.assertIn("humidity", result["fig"].axes[0].get_xlabel())
+        self.assertIn("kg kg", result["fig"].axes[-1].get_xlabel())
 
     def test_missing_target_date_is_rejected_before_fitting(self):
         with nc.Dataset(self.root / "heating.nc", "a") as dataset:
@@ -160,6 +184,18 @@ class WorkflowTests(unittest.TestCase):
         np.savetxt(self.root / "events.csv", [[1, 8]], delimiter=",", fmt="%d",
                    header="time_idx,lon_idx", comments="")
         with self.assertRaisesRegex(ValueError, "outside the selected OLR"):
+            self.run_analysis()
+
+    def test_humidity_dates_must_match_w(self):
+        with nc.Dataset(self.root / "Q.nc", "a") as dataset:
+            dataset.variables["time"][-1] += 1
+        with self.assertRaisesRegex(ValueError, "Humidity and w must have the same calendar dates"):
+            self.run_analysis()
+
+    def test_humidity_pressure_grid_must_match_w(self):
+        with nc.Dataset(self.root / "Q.nc", "a") as dataset:
+            dataset.variables["plev"][0] += 100
+        with self.assertRaisesRegex(ValueError, "Humidity and w must share the plev grid"):
             self.run_analysis()
 
 
