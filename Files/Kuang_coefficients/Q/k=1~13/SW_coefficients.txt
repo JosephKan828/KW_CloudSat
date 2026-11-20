@@ -1,0 +1,4 @@
+# SW: rows = output modes 1,2; columns = q_500hPa_K
+# Unit derivative per K of model q=(L_v/C_p)*specific_humidity at 500 hPa; 1 K = 0.0004018 kg/kg; all other input levels held fixed
+7.679154304826943944e-01
+-1.281390083937660185e+00

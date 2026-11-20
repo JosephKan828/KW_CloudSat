@@ -1,0 +1,6 @@
+Predictor: w
+w(z) = G(z) / (86400 * rho(z)), in m/s
+Coefficient rows: output modes 1,2; columns: input modes or q_500hPa.
+Heating reconstruction: G_J_stack @ coefficient / rho.
+T0=300.0 K; Gamma_T=0.0065 K/m; gravity=9.81 m/s^2; cp=1004.5; R=287.5; p0=100000.0 Pa.
+A relative projection error is NaN when the original response is zero.

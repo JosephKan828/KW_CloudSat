@@ -1,0 +1,11 @@
+Predictor: Q
+Unit derivative per K of model q=(L_v/C_p)*specific_humidity at 500 hPa; 1 K = 0.0004018 kg/kg; all other input levels held fixed
+Coefficient rows: output modes 1,2; columns: input modes or q_500hPa.
+Heating reconstruction: G_J_stack @ coefficient / rho.
+T0=300.0 K; Gamma_T=0.0065 K/m; gravity=9.81 m/s^2; cp=1004.5; R=287.5; p0=100000.0 Pa.
+L_v=2500000.0 J/kg; C_p=1004.5 J/(kg K).
+q_model=(L_v/C_p)*specific_humidity; L_v/C_p=2488.8.
+*_coefficients.txt are per K of model q at 500 hPa.
+*_per_kgkg.txt and *_per_gkg.txt use native specific-humidity units.
+Verification plot amplitude: 1.0 K of model q.
+A relative projection error is NaN when the original response is zero.

@@ -1,0 +1,3 @@
+# 500-hPa humidity coefficients per g/kg; rows = output modes 1,2
+2.110688439117710313e+00
+6.222566117438486089e+00
